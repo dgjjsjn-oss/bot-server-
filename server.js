@@ -103,7 +103,6 @@ app.post('/api/bots/bulk', async function (req, res) {
     } catch (e) {
       errors.push({ name: botName, error: e.message });
     }
-    // Stagger each bot connection by 500ms so server doesn't get overwhelmed
     if (i < countNum - 1) {
       await sleep(500);
     }

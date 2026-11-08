@@ -13,18 +13,18 @@ const DEFAULT_CONFIG = {
   maxBots: 99,
   autoLogin: true,
   botPassword: null,
-  loginDelayMs: 8000,      // Wait 8 seconds after spawn before logging in
-  reconnectDelayMs: 15000, // Wait 15 seconds before reconnecting
-  version: false,          // Auto-detect server version
+  loginDelayMs: 10000,
+  reconnectDelayMs: 15000,
+  version: false,
   autoReply: true,
   replyChance: 0.5,
   maxConsoleLogs: 80,
   autoChatOnJoin: null,
   spamMessage: null,
   spamIntervalMs: 30000,
-  staggerDelayMs: 500,     // 500ms between each bot connection
+  staggerDelayMs: 1000,
   randomBehavior: true,
-  connectTimeoutMs: 15000  // 15 second connection timeout
+  connectTimeoutMs: 15000
 };
 
 const RANDOM_NAMES = [
@@ -106,7 +106,7 @@ function createBot(name, host, port, config = {}) {
   };
 
   let bot = null, keepaliveInterval=null, wanderInterval=null, jumpInterval=null;
-  let lookInterval=null, spamInterval=null, reconnectTimeout=null;
+  let lookInterval=null, spamInterval=null, reconnectTimeout=null, connectTimeout=null;
   const entry = { status, config: merged, _botInstance: bot, consoleLogs: [], hasRegistered: false, loginAttempted: false };
 
   function createInstance() {
@@ -126,12 +126,24 @@ function createBot(name, host, port, config = {}) {
     }
     entry._botInstance = bot;
     addConsoleLog(entry, 'system', 'Connecting to ' + host + ':' + port + ' as ' + name);
-    console.log('[bot:' + name + '] Connecting...');
+    console.log('[bot:' + name + '] Connecting to ' + host + ':' + port);
+
+    // Connection timeout - if bot doesn't login in 15 seconds, something is wrong
+    connectTimeout = setTimeout(() => {
+      if (bot && !status.connected) {
+        addConsoleLog(entry, 'error', 'Connection timed out - server may be blocking or offline');
+        console.error('[bot:' + name + '] Connection timed out');
+        try { bot.end(); } catch(e) {}
+        scheduleReconnect(entry);
+      }
+    }, merged.connectTimeoutMs);
+
     wireEvents(entry, bot);
   }
 
   function wireEvents(entry, botInstance) {
     botInstance.on('login', () => {
+      if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
       status.connected = true; status.lastActivity = new Date().toISOString(); status.error = null;
       addConsoleLog(entry, 'info', 'Logged in to server');
       console.log('[bot:' + name + '] Logged in');
@@ -147,7 +159,6 @@ function createBot(name, host, port, config = {}) {
       }
 
       if (merged.autoLogin && merged.botPassword) {
-        // Wait a random delay before logging in to avoid spamming
         const loginDelay = merged.loginDelayMs + getRandomDelay(0, 3000);
         setTimeout(() => {
           if(botInstance&&botInstance.isChatAvailable()&&!entry.loginAttempted) {
@@ -168,14 +179,20 @@ function createBot(name, host, port, config = {}) {
     });
 
     botInstance.on('end', () => {
+      if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
       status.connected=false; status.loggedIn=false; entry.loginAttempted = false;
       stopKeepalive(entry); stopWander(entry); stopJump(entry); stopLook(entry); stopSpam(entry);
-      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
+      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting in 15s...');
       console.log('[bot:' + name + '] Disconnected');
       scheduleReconnect(entry);
     });
 
-    botInstance.on('error', (err) => { status.error = err.message; addConsoleLog(entry,'error',err.message); console.error('[bot:' + name + '] Error:', err.message); });
+    botInstance.on('error', (err) => {
+      if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
+      status.error = err.message;
+      addConsoleLog(entry,'error',err.message);
+      console.error('[bot:' + name + '] Error:', err.message);
+    });
 
     botInstance.on('chat', (username, message) => {
       if(username===name) return;
