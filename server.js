@@ -15,6 +15,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Pre-configured server from .env
 const defaultHost = process.env.MC_HOST || '';
 const defaultPort = parseInt(process.env.MC_PORT) || 29349;
+let defaultName = process.env.BOT_NAME || 'KeepAliveBot';
 
 if (defaultHost) {
   try {
@@ -24,8 +25,6 @@ if (defaultHost) {
     console.error('[web] Default bot failed:', e.message);
   }
 }
-
-let defaultName = process.env.BOT_NAME || 'KeepAliveBot';
 
 // Auto ping Render keepalive
 const AUTO_PING = process.env.AUTO_PING_SERVER === 'true';

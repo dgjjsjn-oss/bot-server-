@@ -34,6 +34,13 @@ function setupModePills() {
   });
 }
 
+function setModePill(el, m) {
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  selectedMode = m;
+  document.getElementById('summonMode').value = m;
+}
+
 function consoleClass(t) {
   return {error:'error', command:'command', chat:'chat', system:'system'}[t] || 'info';
 }
