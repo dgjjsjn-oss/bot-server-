@@ -19,7 +19,7 @@ let defaultName = process.env.BOT_NAME || 'KeepAliveBot';
 if (defaultHost) {
   try {
     createBot(defaultName, defaultHost, defaultPort, DEFAULT_CONFIG);
-    console.log('[web] Default bot created');
+    console.log('[web] Default bot created: ' + defaultName);
   } catch (e) {
     console.error('[web] Default bot failed:', e.message);
   }

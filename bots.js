@@ -13,16 +13,16 @@ const DEFAULT_CONFIG = {
   maxBots: 99,
   autoLogin: true,
   botPassword: null,
-  loginDelayMs: 10000,
-  reconnectDelayMs: 15000,
+  loginDelayMs: 8000,
+  reconnectDelayMs: 10000,
   version: false,
   autoReply: true,
   replyChance: 0.5,
-  maxConsoleLogs: 80,
+  maxConsoleLogs: 100,
   autoChatOnJoin: null,
   spamMessage: null,
   spamIntervalMs: 30000,
-  staggerDelayMs: 1000,
+  staggerDelayMs: 500,
   randomBehavior: true,
   connectTimeoutMs: 15000
 };
@@ -128,10 +128,9 @@ function createBot(name, host, port, config = {}) {
     addConsoleLog(entry, 'system', 'Connecting to ' + host + ':' + port + ' as ' + name);
     console.log('[bot:' + name + '] Connecting to ' + host + ':' + port);
 
-    // Connection timeout - if bot doesn't login in 15 seconds, something is wrong
     connectTimeout = setTimeout(() => {
       if (bot && !status.connected) {
-        addConsoleLog(entry, 'error', 'Connection timed out - server may be blocking or offline');
+        addConsoleLog(entry, 'error', 'Connection timed out - server may be offline or blocking');
         console.error('[bot:' + name + '] Connection timed out');
         try { bot.end(); } catch(e) {}
         scheduleReconnect(entry);
@@ -182,7 +181,7 @@ function createBot(name, host, port, config = {}) {
       if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
       status.connected=false; status.loggedIn=false; entry.loginAttempted = false;
       stopKeepalive(entry); stopWander(entry); stopJump(entry); stopLook(entry); stopSpam(entry);
-      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting in 15s...');
+      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
       console.log('[bot:' + name + '] Disconnected');
       scheduleReconnect(entry);
     });

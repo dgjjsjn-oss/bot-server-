@@ -3,8 +3,6 @@ let selectedMode = 'idle';
 let serverHost = '';
 let serverPort = '';
 let botCards = {};
-let isPolling = true;
-let pollTimer = null;
 
 const RANDOM_NAMES = [
   "wembo","Player1","Noob","ProGamer","XxSlayer","Bot99","Creeper","Steve","Alex",
@@ -43,9 +41,6 @@ function formatTime(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString();
 }
-
-function escapeHtml(t){if(!t)return'';return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function escapeJs(t){return String(t).replace(/'/g,"\\'").replace(/\\/g,'\\\\');}
 
 async function loadConfig() {
   try {
@@ -86,6 +81,9 @@ async function testConnection() {
   btn.disabled = false; btn.textContent = 'Test Connection';
 }
 
+function escapeHtml(t){if(!t)return'';return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escapeJs(t){return String(t).replace(/'/g,"\\'").replace(/\\/g,'\\\\');}
+
 function createBotCardHTML(b) {
   const live = b.connected;
   const dotClass = live ? 'live' : 'dead';
@@ -94,7 +92,7 @@ function createBotCardHTML(b) {
   const pos = b.position ? ' • ' + Math.round(b.position.x)+','+Math.round(b.position.y)+','+Math.round(b.position.z) : '';
   let logs = '';
   if (b.consoleLogs && b.consoleLogs.length) {
-    logs = b.consoleLogs.slice(-5).map(l =>
+    logs = b.consoleLogs.slice(-8).map(l =>
       '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
     ).join('');
   }
@@ -184,19 +182,6 @@ async function loadBots() {
   } catch(e) { console.error('loadBots error', e); }
 }
 
-async function loadStats() {
-  try {
-    const r = await fetch(BASE + '/api/stats');
-    const s = await r.json();
-    const onlineEl = document.getElementById('statsOnline');
-    const totalEl = document.getElementById('statsTotal');
-    const loggedEl = document.getElementById('statsLoggedIn');
-    if (onlineEl) onlineEl.textContent = s.online;
-    if (totalEl) totalEl.textContent = s.total;
-    if (loggedEl) loggedEl.textContent = s.loggedIn;
-  } catch(e) { console.error('loadStats error', e); }
-}
-
 async function summonBot() {
   const name = document.getElementById('summonName').value.trim();
   const pass = document.getElementById('summonPass').value.trim();
@@ -210,7 +195,7 @@ async function summonBot() {
     });
     if (!r.ok) { const e = await r.json(); alert(e.error||'Failed'); return; }
     document.getElementById('summonName').value=''; document.getElementById('summonPass').value='';
-    loadBots(); loadStats();
+    loadBots();
   } catch(e) { alert('Failed: '+e.message); } finally { btn.disabled=false; btn.textContent='Summon Bot'; }
 }
 
@@ -245,7 +230,7 @@ async function setAutoChat(n) {
   try {
     const r = await fetch(BASE + '/api/bots/'+encodeURIComponent(n)+'/autochat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
     if(!r.ok){const e=await r.json(); alert(e.error||'Failed'); return;}
-    i.value=''; loadBots(); loadStats();
+    i.value=''; loadBots();
   }catch(e){alert('Failed: '+e.message);} finally{i.disabled=false;}
 }
 async function setSpam(n) {
@@ -258,37 +243,9 @@ async function setSpam(n) {
     i.value=''; loadBots();
   }catch(e){alert('Failed: '+e.message);} finally{i.disabled=false; iv.disabled=false;}
 }
-async function bulkSummon() {
-  const count = document.getElementById('bulkCount').value.trim();
-  const prefix = document.getElementById('bulkPrefix').value.trim()||'Bot';
-  const pass = document.getElementById('bulkPass').value.trim();
-  const rn = document.getElementById('bulkRandom').checked;
-  const mode = window.bulkMode || selectedMode || 'wander';
-  const btn = document.getElementById('bulkBtn');
-  const progress = document.getElementById('bulkProgress');
-  const progressBar = document.getElementById('bulkProgressBar');
-  const progressText = document.getElementById('bulkProgressText');
-  btn.disabled=true; btn.textContent='Summoning...';
-  progress.style.display='block';
-  progressBar.style.width='0%';
-  progressText.textContent='Connecting all bots...';
-  try {
-    const r = await fetch(BASE + '/api/bots/bulk', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count, prefix, mode, botPassword:pass||null, autoLogin:pass?true:false, randomNames:rn})});
-    if(!r.ok){const e=await r.json(); alert(e.error||'Bulk failed'); progress.style.display='none'; return;}
-    const d=await r.json();
-    progressBar.style.width='100%';
-    progressText.textContent='Summoned '+d.summoned+'/'+d.requested+' bots'+(d.errors.length?' ('+d.errors.length+' failed)':'');
-    alert('Summoned '+d.summoned+'/'+d.requested+' bots'+(d.errors.length?' ('+d.errors.length+' failed)':''));
-    loadBots(); loadStats();
-  }catch(e){alert('Failed: '+e.message);} finally{
-    btn.disabled=false; btn.textContent='Bulk Summon Bots';
-    setTimeout(()=>{progress.style.display='none';}, 2000);
-  }
-}
 
 document.getElementById('summonBtn').addEventListener('click', summonBot);
 setupModePills();
 loadConfig();
 loadBots();
-loadStats();
-setInterval(()=>{ loadBots(); loadStats(); }, 4000);
+setInterval(()=>{ loadBots(); }, 4000);

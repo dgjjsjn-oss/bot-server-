@@ -3,28 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bot Control Panel - Minecraft Keepalive</title>
+<title>Minecraft Bot Control Panel</title>
 <style>
-  :root{--primary:#6366f1;--primary-hover:#4f46e5;--accent:#06b6d4;--bg:#020617;--card:#0f172a;--card-border:#334155;--text:#f8fafc;--text-muted:#94a3b8;--success:#22c55e;--danger:#ef4444;--warning:#f59e0b}
+  :root{--primary:#6366f1;--primary-hover:#4f46e5;--bg:#020617;--card:#0f172a;--card-border:#334155;--text:#f8fafc;--text-muted:#94a3b8;--success:#22c55e;--danger:#ef4444}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);padding:24px;min-height:100vh}
-  .container{max-width:1400px;margin:0 auto}
+  .container{max-width:1200px;margin:0 auto}
   header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--card-border)}
-  h1{font-size:28px;font-weight:700;background:linear-gradient(90deg,#818cf8,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px}
+  h1{font-size:28px;font-weight:700;background:linear-gradient(90deg,#818cf8,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
   .status-badge{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:var(--success);font-size:12px;font-weight:600}
   .status-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 10px var(--success);animation:pulse 2s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-  .stats-row{display:flex;gap:16px;margin-bottom:24px}
-  .stat-card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;flex:1}
-  .stat-card .label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em}
-  .stat-card .value{font-size:32px;font-weight:700;font-family:ui-monospace,monospace;color:var(--primary);margin-top:8px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
   @media(max-width:900px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:28px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);backdrop-filter:blur(12px)}
-  .card h2{font-size:16px;font-weight:600;margin-bottom:20px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;display:flex;align-items:center;gap:10px}
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:28px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5)}
+  .card h2{font-size:16px;font-weight:600;margin-bottom:20px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em}
   .server-info{display:flex;align-items:center;gap:12px;padding:16px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.1);border-radius:12px;margin-bottom:24px}
   .server-info .label{font-size:12px;color:var(--text-muted);font-weight:600}
-  .server-info .value{font-family:ui-monospace,SFMono-Regular,monospace;color:#818cf8;font-weight:600}
+  .server-info .value{font-family:ui-monospace,monospace;color:#818cf8;font-weight:600}
   .form-group{margin-bottom:16px}
   .form-group label{display:block;font-size:13px;color:var(--text-muted);margin-bottom:8px;font-weight:500}
   .form-control{width:100%;padding:12px;border-radius:10px;border:1px solid var(--card-border);background:#020617;color:var(--text);font-size:14px}
@@ -36,7 +32,6 @@
   .btn-sm{padding:8px 14px;font-size:13px;width:auto}
   .btn-success{background:var(--success);color:white}
   .btn-danger{background:var(--danger);color:white}
-  .btn-warning{background:var(--warning);color:white}
   .btn-secondary{background:var(--card-border);color:var(--text)}
   .btn-sm:hover{transform:translateY(-1px);opacity:0.9}
   .btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -55,7 +50,7 @@
   .feature-section h3{font-size:13px;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.05em}
   .input-row{display:flex;gap:8px;margin-bottom:10px}
   .input-row input[type="text"],.input-row input[type="number"]{flex:1;padding:8px;border-radius:8px;border:1px solid var(--card-border);background:#0f172a;color:var(--text);font-size:13px}
-  .console-box{background:#000;border:1px solid var(--card-border);border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;max-height:180px;overflow-y:auto;margin-bottom:12px}
+  .console-box{background:#000;border:1px solid var(--card-border);border-radius:10px;padding:12px;font-family:ui-monospace,monospace;font-size:11px;max-height:180px;overflow-y:auto;margin-bottom:12px}
   .console-line{margin:1px 0;padding:2px 4px;border-radius:3px;white-space:pre-wrap}
   .console-line.info{color:#93c5fd}.console-line.chat{color:#a5f3fc}.console-line.command{color:#34d399}.console-line.error{color:#f87171}.console-line.system{color:#cbd5e1}
   .console-time{color:#475569;margin-right:6px}
@@ -65,7 +60,6 @@
   .spinner{width:16px;height:16px;border:2px solid var(--card-border);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite;display:inline-block;margin-right:8px}
   @keyframes spin{to{transform:rotate(360deg)}}
   .pos{font-size:11px;color:var(--text-muted);font-family:ui-monospace,monospace}
-  .prefilled{background:#334155;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -74,21 +68,6 @@
     <h1>Bot Control Panel</h1>
     <div class="status-badge" id="globalStatus"><div class="dot"></div><span>System Online</span></div>
   </header>
-
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="label">Total Bots</div>
-      <div class="value" id="statsTotal">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Online</div>
-      <div class="value" id="statsOnline" style="color:var(--success)">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Logged In</div>
-      <div class="value" id="statsLoggedIn" style="color:var(--accent)">0</div>
-    </div>
-  </div>
 
   <div class="card">
     <h2>Server Configuration</h2>
@@ -112,7 +91,7 @@
   </div>
 
   <div class="card">
-    <h2>Summon New Bot</h2>
+    <h2>Summon Bot</h2>
     <div class="form-group">
       <label>Bot Name</label>
       <input type="text" id="summonName" class="form-control" placeholder="e.g. wembo">
@@ -135,32 +114,6 @@
   </div>
 
   <div class="card">
-    <h2>Bulk Summon (Stress Test)</h2>
-    <p class="hint">Spawn up to 99 bots at once with the same behavior type.</p>
-    <div class="form-group"><label>Number of Bots</label><input type="number" id="bulkCount" class="form-control" value="10" min="1" max="99"></div>
-    <div class="form-group"><label>Name Prefix</label><input type="text" id="bulkPrefix" class="form-control" value="Bot"></div>
-    <div class="form-group"><label>Login Password</label><input type="text" id="bulkPass" class="form-control" placeholder="leave empty if none"></div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);margin-bottom:12px">
-      <input type="checkbox" id="bulkRandom" checked> Use random names (e.g. wembo_1234)
-    </label>
-    <div class="form-group"><label>Behavior Mode (all bots get this)</label>
-      <div class="btn-group">
-        <button class="btn btn-secondary btn-sm mode-pill" data-mode="idle" onclick="setBulkMode(this,'idle')">Idle</button>
-        <button class="btn btn-secondary btn-sm mode-pill active" data-mode="wander" onclick="setBulkMode(this,'wander')">Wander</button>
-        <button class="btn btn-secondary btn-sm mode-pill" data-mode="chat" onclick="setBulkMode(this,'chat')">Chat</button>
-      </div>
-      <input type="hidden" id="bulkMode" value="wander">
-    </div>
-    <button class="btn btn-primary" id="bulkBtn" onclick="bulkSummon()">Bulk Summon Bots</button>
-    <div id="bulkProgress" style="display:none; margin-top:12px;">
-      <div style="background:#334155;height:6px;border-radius:3px;overflow:hidden;">
-        <div id="bulkProgressBar" style="background:var(--primary);height:100%;width:0%;transition:width 0.3s;"></div>
-      </div>
-      <div id="bulkProgressText" style="font-size:12px;color:var(--text-muted);margin-top:6px;">Ready</div>
-    </div>
-  </div>
-
-  <div class="card">
     <h2>Active Bots</h2>
     <div id="botList" class="bots-grid">
       <div class="empty-state"><div class="icon">🤖</div><p>No bots yet. Summon your first bot.</p></div>
@@ -169,12 +122,5 @@
 </div>
 
 <script src="app.js"></script>
-<script>
-window.bulkMode='wander';
-function setBulkMode(el,m){
-  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.remove('active'));
-  el.classList.add('active'); window.bulkMode=m; document.getElementById('bulkMode').value=m;
-}
-</script>
 </body>
 </html>
