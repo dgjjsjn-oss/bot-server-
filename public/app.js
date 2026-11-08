@@ -3,6 +3,7 @@ let selectedMode = 'idle';
 let serverHost = '';
 let serverPort = '';
 let botCards = {};
+let isPolling = true;
 
 const RANDOM_NAMES = [
   "wembo","Player1","Noob","ProGamer","XxSlayer","Bot99","Creeper","Steve","Alex",
@@ -34,13 +35,6 @@ function setupModePills() {
   });
 }
 
-function setModePill(el, m) {
-  document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  selectedMode = m;
-  document.getElementById('summonMode').value = m;
-}
-
 function consoleClass(t) {
   return {error:'error', command:'command', chat:'chat', system:'system'}[t] || 'info';
 }
@@ -57,7 +51,36 @@ async function loadConfig() {
     const h = document.getElementById('dashHost'); const p = document.getElementById('dashPort');
     if (h) h.textContent = serverHost || 'Not configured';
     if (p) p.textContent = serverPort || 'Not configured';
+    // Auto-fill test fields
+    const th = document.getElementById('testHost'); const tp = document.getElementById('testPort');
+    if (th && serverHost) th.value = serverHost;
+    if (tp && serverPort) tp.value = serverPort;
   } catch(e) { console.error('config load failed', e); }
+}
+
+async function testConnection() {
+  const h = document.getElementById('testHost').value.trim() || serverHost;
+  const p = document.getElementById('testPort').value.trim() || serverPort || '25565';
+  const btn = document.getElementById('testBtn');
+  const result = document.getElementById('testResult');
+  btn.disabled = true; btn.textContent = 'Testing...';
+  result.style.display = 'block';
+  result.innerHTML = '<div class="console-line system">Testing connection to ' + h + ':' + p + '...</div>';
+  try {
+    const resp = await fetch(BASE + '/api/test-connection', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ host: h, port: p })
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      result.innerHTML = '<div class="console-line command">✓ CONNECTED to ' + data.host + ':' + data.port + '</div><div class="console-line info">Response: ' + (data.result || 'OK') + '</div>';
+    } else {
+      result.innerHTML = '<div class="console-line error">✗ FAILED to connect to ' + data.host + ':' + data.port + '</div><div class="console-line error">Error: ' + data.error + '</div>';
+    }
+  } catch(e) {
+    result.innerHTML = '<div class="console-line error">✗ REQUEST FAILED: ' + e.message + '</div>';
+  }
+  btn.disabled = false; btn.textContent = 'Test Connection';
 }
 
 function escapeHtml(t){if(!t)return'';return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -71,7 +94,7 @@ function createBotCardHTML(b) {
   const pos = b.position ? ' • ' + Math.round(b.position.x)+','+Math.round(b.position.y)+','+Math.round(b.position.z) : '';
   let logs = '';
   if (b.consoleLogs && b.consoleLogs.length) {
-    logs = b.consoleLogs.slice(-10).map(l =>
+    logs = b.consoleLogs.slice(-6).map(l =>
       '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
     ).join('');
   }
@@ -117,46 +140,48 @@ function createBotCardHTML(b) {
 }
 
 async function loadBots() {
-  const r = await fetch(BASE + '/api/bots');
-  const bots = await r.json();
-  const list = document.getElementById('botList');
-  const current = new Set();
-  if (bots.length === 0) {
-    if (!list.children[0] || !list.children[0].classList.contains('empty-state')) {
-      list.innerHTML = '<div class="empty-state"><div class="icon">🤖</div><p>No bots yet. Summon your first bot.</p></div>';
-    }
-    botCards = {}; return;
-  }
-  if (list.children[0] && list.children[0].classList.contains('empty-state')) list.innerHTML = '';
-  for (const b of bots) {
-    current.add(b.name);
-    const cid = 'bot-card-'+escapeJs(b.name);
-    if (!botCards[b.name]) {
-      const d = document.createElement('div'); d.innerHTML = createBotCardHTML(b);
-      list.appendChild(d.firstElementChild);
-      botCards[b.name] = document.getElementById(cid);
-    } else {
-      const c = botCards[b.name];
-      const pos = b.position ? ' • '+Math.round(b.position.x)+','+Math.round(b.position.y)+','+Math.round(b.position.z) : '';
-      const ne = c.querySelector('.bot-name'); const me = c.querySelector('.bot-meta');
-      const se = c.querySelector('.bot-status');
-      if (ne) ne.textContent = escapeHtml(b.name);
-      if (me) me.textContent = b.host+':'+b.port+pos;
-      const login = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
-      if (se) {
-        se.className = 'bot-status '+(b.connected?'connected':'');
-        se.innerHTML = '<div class="dot '+(b.connected?'live':'dead')+'"></div>'+(b.connected?'online':'offline')+login;
+  try {
+    const r = await fetch(BASE + '/api/bots');
+    const bots = await r.json();
+    const list = document.getElementById('botList');
+    const current = new Set();
+    if (bots.length === 0) {
+      if (!list.children[0] || !list.children[0].classList.contains('empty-state')) {
+        list.innerHTML = '<div class="empty-state"><div class="icon">🤖</div><p>No bots yet. Summon your first bot.</p></div>';
       }
-      const cb = c.querySelector('#console-'+escapeJs(b.name));
-      if (cb && b.consoleLogs && b.consoleLogs.length) {
-        const nl = b.consoleLogs.slice(-10).map(l =>
-          '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
-        ).join('');
-        if (cb.innerHTML !== nl) { cb.innerHTML = nl; cb.scrollTop = cb.scrollHeight; }
+      botCards = {}; return;
+    }
+    if (list.children[0] && list.children[0].classList.contains('empty-state')) list.innerHTML = '';
+    for (const b of bots) {
+      current.add(b.name);
+      const cid = 'bot-card-'+escapeJs(b.name);
+      if (!botCards[b.name]) {
+        const d = document.createElement('div'); d.innerHTML = createBotCardHTML(b);
+        list.appendChild(d.firstElementChild);
+        botCards[b.name] = document.getElementById(cid);
+      } else {
+        const c = botCards[b.name];
+        const pos = b.position ? ' • '+Math.round(b.position.x)+','+Math.round(b.position.y)+','+Math.round(b.position.z) : '';
+        const ne = c.querySelector('.bot-name'); const me = c.querySelector('.bot-meta');
+        const se = c.querySelector('.bot-status');
+        if (ne) ne.textContent = escapeHtml(b.name);
+        if (me) me.textContent = b.host+':'+b.port+pos;
+        const login = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
+        if (se) {
+          se.className = 'bot-status '+(b.connected?'connected':'');
+          se.innerHTML = '<div class="dot '+(b.connected?'live':'dead')+'"></div>'+(b.connected?'online':'offline')+login;
+        }
+        const cb = c.querySelector('#console-'+escapeJs(b.name));
+        if (cb && b.consoleLogs && b.consoleLogs.length) {
+          const nl = b.consoleLogs.slice(-6).map(l =>
+            '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
+          ).join('');
+          if (cb.innerHTML !== nl) { cb.innerHTML = nl; cb.scrollTop = cb.scrollHeight; }
+        }
       }
     }
-  }
-  for (const n of Object.keys(botCards)) if (!current.has(n)) { botCards[n].remove(); delete botCards[n]; }
+    for (const n of Object.keys(botCards)) if (!current.has(n)) { botCards[n].remove(); delete botCards[n]; }
+  } catch(e) { console.error('loadBots error', e); }
 }
 
 async function summonBot() {
@@ -174,6 +199,13 @@ async function summonBot() {
     document.getElementById('summonName').value=''; document.getElementById('summonPass').value='';
     loadBots();
   } catch(e) { alert('Failed: '+e.message); } finally { btn.disabled=false; btn.textContent='Summon Bot'; }
+}
+
+async function setModePill(el, m) {
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  selectedMode = m;
+  document.getElementById('summonMode').value = m;
 }
 
 async function setModeBot(n, m) {
@@ -219,14 +251,14 @@ async function bulkSummon() {
   const pass = document.getElementById('bulkPass').value.trim();
   const rn = document.getElementById('bulkRandom').checked;
   const mode = window.bulkMode || selectedMode || 'wander';
-  const btn = document.querySelector('button[onclick="bulkSummon()"]');
+  const btn = document.getElementById('bulkBtn');
   const progress = document.getElementById('bulkProgress');
   const progressBar = document.getElementById('bulkProgressBar');
   const progressText = document.getElementById('bulkProgressText');
   btn.disabled=true; btn.textContent='Summoning...';
   progress.style.display='block';
   progressBar.style.width='0%';
-  progressText.textContent='Starting...';
+  progressText.textContent='Connecting all bots...';
   try {
     const r = await fetch(BASE + '/api/bots/bulk', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count, prefix, mode, botPassword:pass||null, autoLogin:pass?true:false, randomNames:rn})});
     if(!r.ok){const e=await r.json(); alert(e.error||'Bulk failed'); progress.style.display='none'; return;}

@@ -73,14 +73,37 @@
 
   <div class="card">
     <h2>Server Configuration</h2>
-    <div class="server-info"><span class="label">Host</span><span class="value" id="dashHost">Loading...</span><span class="label">Port</span><span class="value" id="dashPort">Loading...</span></div>
+    <div class="server-info">
+      <span class="label">Host</span>
+      <span class="value" id="dashHost">Loading...</span>
+      <span class="label">Port</span>
+      <span class="value" id="dashPort">Loading...</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Connection Test</h2>
+    <p class="hint">Test if bots can reach your server before summoning.</p>
+    <div class="input-row">
+      <input type="text" id="testHost" class="form-control" placeholder="dogpvp.falix.gg">
+      <input type="text" id="testPort" class="form-control" placeholder="29349" style="width:120px;">
+      <button class="btn btn-sm btn-primary" id="testBtn" onclick="testConnection()">Test Connection</button>
+    </div>
+    <div id="testResult" style="display:none;"></div>
   </div>
 
   <div class="card">
     <h2>Summon New Bot</h2>
-    <div class="form-group"><label>Bot Name</label><input type="text" id="summonName" class="form-control" placeholder="e.g. wembo"></div>
-    <div class="form-group"><label>Login Password (AuthMe/LoginSecurity)</label><input type="text" id="summonPass" class="form-control" placeholder="leave empty if none"></div>
-    <div class="form-group"><label>Behavior Mode</label>
+    <div class="form-group">
+      <label>Bot Name</label>
+      <input type="text" id="summonName" class="form-control" placeholder="e.g. wembo">
+    </div>
+    <div class="form-group">
+      <label>Login Password (AuthMe/LoginSecurity)</label>
+      <input type="text" id="summonPass" class="form-control" placeholder="leave empty if none">
+    </div>
+    <div class="form-group">
+      <label>Behavior Mode</label>
       <div class="btn-group">
         <button class="btn btn-secondary btn-sm mode-pill active" data-mode="idle" onclick="setModePill(this,'idle')">Idle</button>
         <button class="btn btn-secondary btn-sm mode-pill" data-mode="wander" onclick="setModePill(this,'wander')">Wander</button>
@@ -109,7 +132,7 @@
       </div>
       <input type="hidden" id="bulkMode" value="wander">
     </div>
-    <button class="btn btn-primary" onclick="bulkSummon()" id="bulkBtn">Bulk Summon Bots</button>
+    <button class="btn btn-primary" id="bulkBtn" onclick="bulkSummon()">Bulk Summon Bots</button>
     <div id="bulkProgress" style="display:none; margin-top:12px;">
       <div style="background:#334155;height:6px;border-radius:3px;overflow:hidden;">
         <div id="bulkProgressBar" style="background:var(--primary);height:100%;width:0%;transition:width 0.3s;"></div>

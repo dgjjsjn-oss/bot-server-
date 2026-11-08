@@ -103,7 +103,9 @@ app.post('/api/bots/bulk', async function (req, res) {
     } catch (e) {
       errors.push({ name: botName, error: e.message });
     }
-    // Connect all bots at once (no stagger) for instant full server test
+    if (i < countNum - 1) {
+      await sleep(500);
+    }
   }
 
   res.status(201).json({ summoned: results.length, requested: countNum, bots: results, errors: errors });
@@ -148,6 +150,19 @@ app.post('/api/bots/:name/spam', function (req, res) {
   const { message, intervalMs } = req.body;
   try { res.json({ ok: true, ...setSpam(req.params.name, message, intervalMs) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.post('/api/test-connection', async function (req, res) {
+  const { host, port } = req.body;
+  const h = host || defaultHost;
+  const p = port || defaultPort;
+  if (!h) return res.status(400).json({ error: 'no host' });
+  try {
+    const result = await pingServer(h, parseInt(p) || 25565);
+    res.json({ ok: true, host: h, port: p, result: result.raw ? result.raw.substring(0, 300) : 'connected' });
+  } catch (e) {
+    res.json({ ok: false, host: h, port: p, error: e.message });
+  }
 });
 
 app.post('/api/ping-server', async function (req, res) {
