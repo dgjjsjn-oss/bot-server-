@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minecraft Bot Control Panel</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  h1 { font-size: 22px; margin-bottom: 20px; letter-spacing: -0.02em; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; margin: 0 auto; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); }
+  h2 { font-size: 16px; margin-bottom: 16px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+  label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+  input, select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 14px; margin-bottom: 12px; }
+  button { width: 100%; padding: 10px; border-radius: 8px; border: none; background: #3b82f6; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; margin-bottom: 8px; }
+  button:hover { background: #2563eb; }
+  button.danger { background: #ef4444; }
+  button.danger:hover { background: #dc2626; }
+  button.secondary { background: #475569; }
+  button.secondary:hover { background: #334155; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .bot-list { margin-top: 12px; }
+  .bot-item { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .bot-name { font-weight: 700; color: #38bdf8; }
+  .bot-status { font-size: 12px; font-family: ui-monospace, monospace; }
+  .status-ok { color: #34d399; }
+  .status-bad { color: #f87171; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  .dot.live { background: #34d399; box-shadow: 0 0 8px #34d399; }
+  .dot.dead { background: #f87171; box-shadow: 0 0 8px #f87171; }
+  .controls { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .controls button { width: auto; flex: 1; min-width: 70px; }
+  .chat-row { display: flex; gap: 8px; margin-top: 8px; }
+  .chat-row input { margin-bottom: 0; flex: 1; }
+  .chat-row button { width: auto; flex: none; }
+  .mode-pills { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .mode-pill { padding: 4px 10px; border-radius: 20px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 12px; cursor: pointer; }
+  .mode-pill.active { border-color: #3b82f6; color: #38bdf8; }
+  .hint { margin-top: 14px; font-size: 12px; color: #64748b; line-height: 1.5; }
+  .empty { color: #64748b; font-style: italic; margin-top: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="card">
+    <h1><span class="dot live"></span>Bot Control Panel</h1>
+    <h2>Summon a real player bot</h2>
+    <label>Bot name (any name, e.g. YouTuber)</label>
+    <input type="text" id="summonName" placeholder="wembo">
+    <label>Server host (IP or domain)</label>
+    <input type="text" id="summonHost" placeholder="mc.example.aternos.me">
+    <label>Port</label>
+    <input type="text" id="summonPort" placeholder="25565">
+    <label>Behavior mode</label>
+    <div class="mode-pills">
+      <div class="mode-pill active" data-mode="idle">Idle (no lag)</div>
+      <div class="mode-pill" data-mode="wander">Wander</div>
+      <div class="mode-pill" data-mode="chat">Chat</div>
+    </div>
+    <input type="hidden" id="summonMode" value="idle">
+    <button id="summonBtn">Summon bot</button>
+    <p class="hint">Bots join with no Minecraft account and appear in the server Tab list like real players. Use Idle mode to avoid lag.</p>
+  </div>
+
+  <div class="card">
+    <h2>Active bots</h2>
+    <div id="botList" class="bot-list">
+      <div class="empty">No bots yet. Summon one above.</div>
+    </div>
+    <p class="hint">Paste your Render URL into Uptime Robot and ping /ping every 5-10 minutes to keep everything alive.</p>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
