@@ -9,15 +9,15 @@ const DEFAULT_CONFIG = {
   keepaliveIntervalMs: 120000,
   wanderIntervalMs: 10000,
   jumpIntervalMs: 15000,
-  lookIntervalMs: 4000,
+  lookIntervalMs: 5000,
   maxBots: 99,
   autoLogin: true,
   botPassword: null,
   loginDelayMs: 8000,
-  reconnectDelayMs: 10000,
+  reconnectDelayMs: 5000,
   version: false,
   autoReply: true,
-  replyChance: 0.5,
+  replyChance: 0.6,
   maxConsoleLogs: 100,
   autoChatOnJoin: null,
   spamMessage: null,
@@ -181,7 +181,7 @@ function createBot(name, host, port, config = {}) {
       if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
       status.connected=false; status.loggedIn=false; entry.loginAttempted = false;
       stopKeepalive(entry); stopWander(entry); stopJump(entry); stopLook(entry); stopSpam(entry);
-      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
+      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting in 5s...');
       console.log('[bot:' + name + '] Disconnected');
       scheduleReconnect(entry);
     });
