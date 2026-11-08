@@ -10,7 +10,7 @@ const DEFAULT_CONFIG = {
   wanderIntervalMs: 15000,
   jumpIntervalMs: 20000,
   lookIntervalMs: 5000,
-  maxBots: 10,
+  maxBots: 99,
   autoLogin: true,
   botPassword: null,
   loginDelayMs: 5000,
@@ -18,7 +18,10 @@ const DEFAULT_CONFIG = {
   version: '1.21.11',
   autoReply: true,
   replyChance: 0.7,
-  maxConsoleLogs: 100
+  maxConsoleLogs: 100,
+  autoChatOnJoin: null,
+  spamMessage: null,
+  spamIntervalMs: 30000
 };
 
 const AUTO_REPLIES = [
@@ -35,7 +38,7 @@ function getRandomReply() {
 function addConsoleLog(entry, type, message) {
   const log = {
     time: new Date().toISOString(),
-    type: type, // 'info', 'chat', 'command', 'error', 'system'
+    type: type,
     message: message
   };
   entry.consoleLogs.push(log);
@@ -71,6 +74,7 @@ function createBot(name, host, port, config = {}) {
   let wanderInterval = null;
   let jumpInterval = null;
   let lookInterval = null;
+  let spamInterval = null;
   let reconnectTimeout = null;
 
   const entry = {
@@ -98,6 +102,7 @@ function createBot(name, host, port, config = {}) {
 
     entry._botInstance = bot;
     addConsoleLog(entry, 'system', 'Bot instance created, connecting to ' + host + ':' + port);
+    console.log('[bot:' + name + '] Bot instance created');
     wireEvents(entry, bot);
   }
 
@@ -107,7 +112,7 @@ function createBot(name, host, port, config = {}) {
       status.lastActivity = new Date().toISOString();
       status.error = null;
       addConsoleLog(entry, 'info', 'Logged in to server');
-      console.log('[bot:' + name + '] Logged in to server');
+      console.log('[bot:' + name + '] Logged in');
     });
 
     botInstance.on('spawn', function () {
@@ -119,7 +124,20 @@ function createBot(name, host, port, config = {}) {
       startWander(entry);
       startJump(entry);
       startLook(entry);
+      startSpam(entry);
 
+      // Auto-chat on join
+      if (merged.autoChatOnJoin) {
+        setTimeout(function () {
+          if (botInstance && botInstance.isChatAvailable() && status.loggedIn) {
+            botInstance.chat(merged.autoChatOnJoin);
+            addConsoleLog(entry, 'command', merged.autoChatOnJoin);
+            console.log('[bot:' + name + '] Auto-chat on join: ' + merged.autoChatOnJoin);
+          }
+        }, 3000);
+      }
+
+      // Auto login
       if (merged.autoLogin && merged.botPassword) {
         setTimeout(function () {
           if (botInstance && botInstance.isChatAvailable()) {
@@ -141,8 +159,9 @@ function createBot(name, host, port, config = {}) {
       stopWander(entry);
       stopJump(entry);
       stopLook(entry);
+      stopSpam(entry);
       addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
-      console.log('[bot:' + name + '] Disconnected. Reconnecting...');
+      console.log('[bot:' + name + '] Disconnected');
       scheduleReconnect(entry);
     });
 
@@ -163,7 +182,7 @@ function createBot(name, host, port, config = {}) {
             const reply = getRandomReply();
             botInstance.chat(reply);
             addConsoleLog(entry, 'command', reply);
-            console.log('[bot:' + name + '] Auto-replied to ' + username);
+            console.log('[bot:' + name + '] Auto-replied: ' + reply);
           }
         }, 1000 + Math.random() * 3000);
       }
@@ -185,7 +204,7 @@ function createBot(name, host, port, config = {}) {
     entry._reconnectTimeout = setTimeout(function () {
       if (bots.has(name)) {
         addConsoleLog(entry, 'system', 'Attempting reconnect...');
-        console.log('[bot:' + name + '] Attempting reconnect...');
+        console.log('[bot:' + name + '] Reconnecting...');
         createInstance();
       }
     }, merged.reconnectDelayMs);
@@ -215,8 +234,7 @@ function createBot(name, host, port, config = {}) {
       const target = pos.offset(offset);
       try {
         entry._botInstance.pathfinder.setGoal(new (require('mineflayer-pathfinder').GoalNear)(target.x, target.y, target.z, 1));
-        addConsoleLog(entry, 'info', 'Walking to ' + Math.round(target.x) + ',' + Math.round(target.y) + ',' + Math.round(target.z));
-      } catch (e) { /* skip movement silently */ }
+      } catch (e) { /* skip */ }
       status.position = { x: pos.x, y: pos.y, z: pos.z };
       status.lastActivity = new Date().toISOString();
     }, merged.wanderIntervalMs);
@@ -235,7 +253,6 @@ function createBot(name, host, port, config = {}) {
         setTimeout(function () {
           if (entry._botInstance) entry._botInstance.setControlState('jump', false);
         }, 500);
-        addConsoleLog(entry, 'info', 'Jumped');
       } catch (e) { /* skip */ }
     }, merged.jumpIntervalMs);
   }
@@ -266,6 +283,22 @@ function createBot(name, host, port, config = {}) {
     if (entry._lookInt) { clearInterval(entry._lookInt); entry._lookInt = null; }
   }
 
+  function startSpam(entry) {
+    if (!merged.spamMessage || entry._spamInt) return;
+    entry._spamInt = setInterval(function () {
+      const botRef = entry._botInstance;
+      if (botRef && botRef.isChatAvailable() && status.loggedIn) {
+        botRef.chat(merged.spamMessage);
+        addConsoleLog(entry, 'command', merged.spamMessage);
+        console.log('[bot:' + name + '] Spam: ' + merged.spamMessage);
+      }
+    }, merged.spamIntervalMs);
+  }
+
+  function stopSpam(entry) {
+    if (entry._spamInt) { clearInterval(entry._spamInt); entry._spamInt = null; }
+  }
+
   createInstance();
 
   bots.set(name, entry);
@@ -286,7 +319,10 @@ function listBots() {
       lastActivity: entry.status.lastActivity,
       error: entry.status.error,
       position: entry.status.position,
-      consoleLogs: entry.consoleLogs.slice(-20) // last 20 logs
+      consoleLogs: entry.consoleLogs.slice(-20),
+      autoChatOnJoin: entry.config.autoChatOnJoin,
+      spamMessage: entry.config.spamMessage,
+      spamIntervalMs: entry.config.spamIntervalMs
     });
   }
   return out;
@@ -297,7 +333,10 @@ function getBot(name) {
   if (!entry) return null;
   return {
     ...entry.status,
-    consoleLogs: entry.consoleLogs.slice(-50)
+    consoleLogs: entry.consoleLogs.slice(-50),
+    autoChatOnJoin: entry.config.autoChatOnJoin,
+    spamMessage: entry.config.spamMessage,
+    spamIntervalMs: entry.config.spamIntervalMs
   };
 }
 
@@ -349,8 +388,27 @@ function botChat(name, message) {
   }
 }
 
-function botCommand(name, command) {
-  return botChat(name, command); // same thing - send text to bot
+function setAutoChat(name, message) {
+  const entry = bots.get(name);
+  if (!entry) throw new Error('Bot not found: ' + name);
+  entry.config.autoChatOnJoin = message || null;
+  addConsoleLog(entry, 'system', 'Auto-chat on join set to: ' + (message || 'none'));
+  return { ok: true, autoChatOnJoin: entry.config.autoChatOnJoin };
+}
+
+function setSpam(name, message, intervalMs) {
+  const entry = bots.get(name);
+  if (!entry) throw new Error('Bot not found: ' + name);
+  stopSpam(entry);
+  entry.config.spamMessage = message || null;
+  entry.config.spamIntervalMs = intervalMs || 30000;
+  if (message) {
+    startSpam(entry);
+    addConsoleLog(entry, 'system', 'Spam enabled: "' + message + '" every ' + intervalMs + 'ms');
+  } else {
+    addConsoleLog(entry, 'system', 'Spam disabled');
+  }
+  return { ok: true, spamMessage: entry.config.spamMessage, spamIntervalMs: entry.config.spamIntervalMs };
 }
 
 module.exports = {
@@ -360,6 +418,7 @@ module.exports = {
   removeBot: removeBot,
   setMode: setMode,
   botChat: botChat,
-  botCommand: botCommand,
+  setAutoChat: setAutoChat,
+  setSpam: setSpam,
   DEFAULT_CONFIG: DEFAULT_CONFIG
 };

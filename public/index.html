@@ -3,89 +3,738 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Minecraft Bot Control Panel</title>
+<title>Bot Control Panel - Minecraft Keepalive</title>
 <style>
+  :root {
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --accent: #06b6d4;
+    --bg: #020617;
+    --card: #0f172a;
+    --card-border: #334155;
+    --text: #f8fafc;
+    --text-muted: #94a3b8;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
-  h1 { font-size: 22px; margin-bottom: 20px; letter-spacing: -0.02em; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
-  
-  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); }
-  h2 { font-size: 16px; margin-bottom: 16px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-  label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
-  input, select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 14px; margin-bottom: 12px; }
-  button { width: 100%; padding: 10px; border-radius: 8px; border: none; background: #3b82f6; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; margin-bottom: 8px; }
-  button:hover { background: #2563eb; }
-  button.danger { background: #ef4444; }
-  button.danger:hover { background: #dc2626; }
-  button.secondary { background: #475569; }
-  button.secondary:hover { background: #334155; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .bot-list { margin-top: 12px; }
-  .bot-item { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
-  .bot-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .bot-name { font-weight: 700; color: #38bdf8; }
-  .bot-status { font-size: 12px; font-family: ui-monospace, monospace; }
-  .status-ok { color: #34d399; }
-  .status-bad { color: #f87171; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
-  .dot.live { background: #34d399; box-shadow: 0 0 8px #34d399; }
-  .dot.dead { background: #f87171; box-shadow: 0 0 8px #f87171; }
-  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
-  .controls button { width: auto; flex: 1; min-width: 70px; }
-  .chat-row { display: flex; gap: 8px; }
-  .chat-row input { margin-bottom: 0; flex: 1; }
-  .chat-row button { width: auto; flex: none; }
-  .console-box { background: #020617; border: 1px solid #334155; border-radius: 8px; padding: 12px; font-family: ui-monospace, monospace; font-size: 11px; max-height: 300px; overflow-y: auto; margin-bottom: 10px; }
-  .console-line { margin: 2px 0; padding: 2px 4px; border-radius: 4px; white-space: pre-wrap; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #818cf8, #22d3ee);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    color: var(--success);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status-badge .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 10px var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+  }
+
+  .card h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .server-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.1);
+    border-radius: 12px;
+    margin-bottom: 24px;
+  }
+
+  .server-info .label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .server-info .value {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: #818cf8;
+    font-weight: 600;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background: #020617;
+    color: var(--text);
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: linear-gradient(90deg, #6366f1, #4f46e5);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-sm {
+    padding: 8px 14px;
+    font-size: 13px;
+    width: auto;
+  }
+
+  .btn-success { background: var(--success); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-warning { background: var(--warning); color: white; }
+  .btn-secondary { background: var(--card-border); color: var(--text); }
+
+  .btn-sm:hover { transform: translateY(-1px); opacity: 0.9; }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .bots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+  }
+
+  .bot-card {
+    background: #020617;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bot-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #818cf8, #22d3ee);
+    opacity: 0.5;
+  }
+
+  .bot-card.connected::before {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    opacity: 0.8;
+  }
+
+  .bot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .bot-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .bot-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+    margin-bottom: 4px;
+  }
+
+  .bot-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .bot-status .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 8px var(--danger);
+  }
+
+  .bot-status.connected .dot {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+  }
+
+  .controls-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .feature-section {
+    background: #020617;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .feature-section h3 {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .input-row input[type="text"],
+  .input-row input[type="number"] {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: #0f172a;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .console-box {
+    background: #000;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 11px;
+    max-height: 180px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+  }
+
+  .console-line {
+    margin: 1px 0;
+    padding: 2px 4px;
+    border-radius: 3px;
+    white-space: pre-wrap;
+  }
+
   .console-line.info { color: #93c5fd; }
   .console-line.chat { color: #a5f3fc; }
   .console-line.command { color: #34d399; }
   .console-line.error { color: #f87171; }
   .console-line.system { color: #cbd5e1; }
-  .console-time { color: #64748b; margin-right: 8px; }
-  .mode-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-  .mode-pill { padding: 4px 10px; border-radius: 20px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 12px; cursor: pointer; }
-  .mode-pill.active { border-color: #3b82f6; color: #38bdf8; }
-  .hint { margin-top: 10px; font-size: 12px; color: #64748b; line-height: 1.5; }
-  .empty { color: #64748b; font-style: italic; margin-top: 20px; text-align: center; }
-  .pos { font-size: 11px; color: #94a3b8; font-family: ui-monospace, monospace; }
+
+  .console-time {
+    color: #475569;
+    margin-right: 6px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+  }
+
+  .empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 12px;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--card-border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 8px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .pos {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+  }
 </style>
 </head>
 <body>
-<div class="grid">
-  <div class="card">
-    <h1><span class="dot live"></span>Bot Control Panel</h1>
-    <h2>Summon a real player bot</h2>
-    <label>Bot name (any name, e.g. wembo)</label>
-    <input type="text" id="summonName" placeholder="wembo">
-    <label>Server host (IP or domain)</label>
-    <input type="text" id="summonHost" placeholder="dogpvp.falix.gg">
-    <label>Port</label>
-    <input type="text" id="summonPort" placeholder="29349">
-    <label>Login password (for AuthMe/LoginSecurity)</label>
-    <input type="text" id="summonPass" placeholder="leave empty if none">
-    <label>Behavior mode</label>
-    <div class="mode-pills">
-      <div class="mode-pill active" data-mode="idle">Idle (no lag)</div>
-      <div class="mode-pill" data-mode="wander">Wander + jump</div>
-      <div class="mode-pill" data-mode="chat">Chat only</div>
+<div class="container">
+  <header>
+    <h1>Bot Control Panel</h1>
+    <div class="status-badge" id="globalStatus">
+      <div class="dot"></div>
+      <span>System Online</span>
     </div>
-    <input type="hidden" id="summonMode" value="idle">
-    <button id="summonBtn">Summon bot</button>
-    <p class="hint">Bot joins with no Minecraft account. If your server uses AuthMe/LoginSecurity, set the password so the bot can auto-login.</p>
+  </header>
+
+  <div class="card">
+    <h2>Server Configuration</h2>
+    <div class="server-info">
+      <span class="label">Host</span>
+      <span class="value" id="dashHost">Loading...</span>
+      <span class="label">Port</span>
+      <span class="value" id="dashPort">Loading...</span>
+    </div>
   </div>
 
   <div class="card">
-    <h2>Active bots</h2>
-    <div id="botList" class="bot-list">
-      <div class="empty">No bots yet. Summon one above.</div>
+    <h2>Summon New Bot</h2>
+    <div class="form-group">
+      <label>Bot Name</label>
+      <input type="text" id="summonName" class="form-control" placeholder="e.g. wembo, Player1, Noob">
     </div>
-    <p class="hint">Paste your Render URL into Uptime Robot and ping /ping every 5-10 minutes to keep everything alive.</p>
+    <div class="form-group">
+      <label>Login Password (if server uses AuthMe/LoginSecurity)</label>
+      <input type="text" id="summonPass" class="form-control" placeholder="leave empty if none">
+    </div>
+    <div class="form-group">
+      <label>Behavior Mode</label>
+      <div class="btn-group">
+        <button class="btn btn-secondary btn-sm mode-pill active" data-mode="idle" onclick="setModePill(this, 'idle')">Idle</button>
+        <button class="btn btn-secondary btn-sm mode-pill" data-mode="wander" onclick="setModePill(this, 'wander')">Wander</button>
+        <button class="btn btn-secondary btn-sm mode-pill" data-mode="chat" onclick="setModePill(this, 'chat')">Chat</button>
+      </div>
+      <input type="hidden" id="summonMode" value="idle">
+    </div>
+    <button class="btn btn-primary" id="summonBtn" onclick="summonBot()">Summon Bot</button>
+    <p class="hint">Bots join with no Minecraft account. Host and port are pre-configured from your Render settings.</p>
+  </div>
+
+  <div class="card">
+    <h2>Bulk Summon (Stress Test)</h2>
+    <p class="hint">Spawn up to 99 bots at once with rotating modes to test your hosting.</p>
+    <div class="form-group">
+      <label>Number of Bots</label>
+      <input type="number" id="bulkCount" class="form-control" value="10" min="1" max="99">
+    </div>
+    <div class="form-group">
+      <label>Name Prefix</label>
+      <input type="text" id="bulkPrefix" class="form-control" value="TestBot">
+    </div>
+    <div class="form-group">
+      <label>Login Password (optional)</label>
+      <input type="text" id="bulkPass" class="form-control" placeholder="leave empty if none">
+    </div>
+    <button class="btn btn-primary" onclick="bulkSummon()">Bulk Summon Bots</button>
+  </div>
+
+  <div class="card">
+    <h2>Active Bots</h2>
+    <div id="botList" class="bots-grid">
+      <div class="empty-state">
+        <div class="icon">🤖</div>
+        <p>No bots yet. Summon your first bot above.</p>
+      </div>
+    </div>
   </div>
 </div>
 
-<script src="app.js"></script>
+<script>
+  let selectedMode = 'idle';
+
+  function setModePill(el, mode) {
+    document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    selectedMode = mode;
+    document.getElementById('summonMode').value = mode;
+  }
+
+  async function loadConfig() {
+    try {
+      const res = await fetch('/api/config');
+      const cfg = await res.json();
+      document.getElementById('dashHost').textContent = cfg.host || 'Not configured';
+      document.getElementById('dashPort').textContent = cfg.port || 'Not configured';
+    } catch (e) {
+      console.error('Failed to load config', e);
+    }
+  }
+
+  function consoleClass(type) {
+    switch (type) {
+      case 'error': return 'error';
+      case 'command': return 'command';
+      case 'chat': return 'chat';
+      case 'system': return 'system';
+      default: return 'info';
+    }
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString();
+  }
+
+  async function loadBots() {
+    const res = await fetch('/api/bots');
+    const bots = await res.json();
+    const list = document.getElementById('botList');
+    list.innerHTML = '';
+
+    if (bots.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🤖</div>
+          <p>No bots yet. Summon your first bot above.</p>
+        </div>
+      `;
+      return;
+    }
+
+    for (const b of bots) {
+      const card = document.createElement('div');
+      card.className = 'bot-card ' + (b.connected ? 'connected' : '');
+
+      let logsHtml = '';
+      if (b.consoleLogs && b.consoleLogs.length > 0) {
+        logsHtml = b.consoleLogs.slice(-10).map(log =>
+          `<div class="console-line ${consoleClass(log.type)}">
+            <span class="console-time">[${formatTime(log.time)}]</span>
+            ${escapeHtml(log.message)}
+          </div>`
+        ).join('');
+      }
+
+      const pos = b.position ? `• ${Math.round(b.position.x)},${Math.round(b.position.y)},${Math.round(b.position.z)}` : '';
+
+      card.innerHTML = `
+        <div class="bot-header">
+          <div>
+            <div class="bot-name">${escapeHtml(b.name)}</div>
+            <div class="bot-meta">${b.host}:${b.port} ${pos}</div>
+          </div>
+          <div class="bot-status ${b.connected ? 'connected' : ''}">
+            <div class="dot"></div>
+            ${b.connected ? 'Online' : 'Offline'}
+          </div>
+        </div>
+
+        <div class="controls-row">
+          <button class="btn btn-sm btn-secondary" onclick="setModeBot('${escapeJs(b.name)}', 'idle')">Idle</button>
+          <button class="btn btn-sm btn-secondary" onclick="setModeBot('${escapeJs(b.name)}', 'wander')">Wander</button>
+          <button class="btn btn-sm btn-danger" onclick="kickBot('${escapeJs(b.name)}')">Kick</button>
+        </div>
+
+        <div class="feature-section">
+          <h3>Send Command / Chat</h3>
+          <div class="input-row">
+            <input type="text" id="chatInput-${escapeJs(b.name)}" placeholder="Type anything...">
+            <button class="btn btn-sm btn-primary" onclick="sendChat('${escapeJs(b.name)}')">Send</button>
+          </div>
+        </div>
+
+        <div class="feature-section">
+          <h3>Auto-Chat on Join</h3>
+          <div class="input-row">
+            <input type="text" id="autoChatInput-${escapeJs(b.name)}" placeholder="Message to send on spawn...">
+            <button class="btn btn-sm btn-primary" onclick="setAutoChat('${escapeJs(b.name)}')">Set</button>
+          </div>
+        </div>
+
+        <div class="feature-section">
+          <h3>Spam / Repeat</h3>
+          <div class="input-row">
+            <input type="text" id="spamInput-${escapeJs(b.name)}" placeholder="Message to repeat...">
+            <input type="number" id="spamInterval-${escapeJs(b.name)}" placeholder="ms" value="30000" style="width:80px;">
+            <button class="btn btn-sm btn-warning" onclick="setSpam('${escapeJs(b.name)}')">Set Spam</button>
+          </div>
+        </div>
+
+        <div class="feature-section">
+          <h3>Live Console</h3>
+          <div class="console-box" id="console-${escapeJs(b.name)}">
+            ${logsHtml || '<div class="console-line system">No logs yet...</div>'}
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+
+      const consoleBox = document.getElementById('console-' + escapeJs(b.name));
+      if (consoleBox) consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+  }
+
+  async function summonBot() {
+    const name = document.getElementById('summonName').value.trim();
+    const pass = document.getElementById('summonPass').value.trim();
+    const mode = document.getElementById('summonMode').value;
+    const btn = document.getElementById('summonBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div>Summoning...';
+
+    try {
+      const res = await fetch('/api/bots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          mode: mode,
+          botPassword: pass || null,
+          autoLogin: pass ? true : false
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Failed to summon bot');
+        return;
+      }
+      document.getElementById('summonName').value = '';
+      document.getElementById('summonPass').value = '';
+      loadBots();
+    } catch (e) {
+      alert('Request failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Summon Bot';
+    }
+  }
+
+  async function setModeBot(name, mode) {
+    const res = await fetch('/api/bots/' + encodeURIComponent(name) + '/mode', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: mode })
+    });
+    if (res.ok) loadBots();
+    else alert('Failed to change mode');
+  }
+
+  async function kickBot(name) {
+    if (!confirm('Remove bot ' + name + '?')) return;
+    const res = await fetch('/api/bots/' + encodeURIComponent(name), { method: 'DELETE' });
+    if (res.ok) loadBots();
+    else alert('Failed to kick bot');
+  }
+
+  async function sendChat(name) {
+    const input = document.getElementById('chatInput-' + escapeJs(name));
+    const message = input.value.trim();
+    if (!message) return;
+    input.disabled = true;
+    try {
+      const res = await fetch('/api/bots/' + encodeURIComponent(name) + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Failed to send');
+        return;
+      }
+      input.value = '';
+    } catch (e) {
+      alert('Request failed: ' + e.message);
+    } finally {
+      input.disabled = false;
+    }
+  }
+
+  async function setAutoChat(name) {
+    const input = document.getElementById('autoChatInput-' + escapeJs(name));
+    const message = input.value.trim();
+    if (!message) return;
+    input.disabled = true;
+    try {
+      const res = await fetch('/api/bots/' + encodeURIComponent(name) + '/autochat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Failed to set auto-chat');
+        return;
+      }
+      input.value = '';
+      loadBots();
+    } catch (e) {
+      alert('Request failed: ' + e.message);
+    } finally {
+      input.disabled = false;
+    }
+  }
+
+  async function setSpam(name) {
+    const input = document.getElementById('spamInput-' + escapeJs(name));
+    const intervalInput = document.getElementById('spamInterval-' + escapeJs(name));
+    const message = input.value.trim();
+    const intervalMs = parseInt(intervalInput.value) || 30000;
+    if (!message) return;
+    input.disabled = true;
+    intervalInput.disabled = true;
+    try {
+      const res = await fetch('/api/bots/' + encodeURIComponent(name) + '/spam', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, intervalMs: intervalMs })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Failed to set spam');
+        return;
+      }
+      input.value = '';
+      loadBots();
+    } catch (e) {
+      alert('Request failed: ' + e.message);
+    } finally {
+      input.disabled = false;
+      intervalInput.disabled = false;
+    }
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function escapeJs(text) {
+    return String(text).replace(/'/g, "\\'").replace(/\\/g, '\\\\');
+  }
+
+  loadConfig();
+  loadBots();
+  setInterval(loadBots, 5000);
+</script>
 </body>
 </html>

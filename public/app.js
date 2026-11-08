@@ -1,5 +1,7 @@
 const BASE = '';
 let selectedMode = 'idle';
+let serverHost = '';
+let serverPort = '';
 
 function setupModePills() {
   document.querySelectorAll('.mode-pill').forEach(function (pill) {
@@ -33,6 +35,19 @@ function formatTime(iso) {
   }
 }
 
+async function loadConfig() {
+  try {
+    const res = await fetch(BASE + '/api/config');
+    const cfg = await res.json();
+    serverHost = cfg.host || '';
+    serverPort = cfg.port || '';
+    document.getElementById('serverHost').textContent = serverHost || 'not set';
+    document.getElementById('serverPort').textContent = serverPort || 'not set';
+  } catch (e) {
+    console.error('Failed to load config:', e);
+  }
+}
+
 async function loadBots() {
   const res = await fetch(BASE + '/api/bots');
   const bots = await res.json();
@@ -50,7 +65,6 @@ async function loadBots() {
     const loginText = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
     const pos = b.position ? (' • ' + Math.round(b.position.x) + ',' + Math.round(b.position.y) + ',' + Math.round(b.position.z)) : '';
 
-    // Console logs HTML
     let logsHtml = '';
     if (b.consoleLogs && b.consoleLogs.length > 0) {
       logsHtml = b.consoleLogs.map(function (log) {
@@ -79,14 +93,22 @@ async function loadBots() {
       '<button class="secondary" onclick="setModeBot(\'' + escapeJs(b.name) + '\', \'wander\')">Wander</button>' +
       '<button class="danger" onclick="kickBot(\'' + escapeJs(b.name) + '\')">Kick</button>' +
       '</div>' +
-      '<div class="console-box" id="console-' + escapeJs(b.name) + '">' + logsHtml + '</div>' +
       '<div class="chat-row">' +
       '<input type="text" id="chatInput-' + escapeJs(b.name) + '" placeholder="Type command or chat...">' +
       '<button onclick="sendChat(\'' + escapeJs(b.name) + '\')">Send</button>' +
-      '</div>';
+      '</div>' +
+      '<div class="feature-row">' +
+      '<input type="text" id="autoChatInput-' + escapeJs(b.name) + '" placeholder="Auto-chat on join...">' +
+      '<button onclick="setAutoChat(\'' + escapeJs(b.name) + '\')">Set Auto-Chat</button>' +
+      '</div>' +
+      '<div class="feature-row">' +
+      '<input type="text" id="spamInput-' + escapeJs(b.name) + '" placeholder="Spam message...">' +
+      '<input type="number" id="spamIntervalInput-' + escapeJs(b.name) + '" placeholder="ms" value="30000" style="width:80px;">' +
+      '<button onclick="setSpam(\'' + escapeJs(b.name) + '\')">Set Spam</button>' +
+      '</div>' +
+      '<div class="console-box" id="console-' + escapeJs(b.name) + '">' + logsHtml + '</div>';
     list.appendChild(item);
 
-    // Auto-scroll console to bottom
     const consoleBox = document.getElementById('console-' + escapeJs(b.name));
     if (consoleBox) consoleBox.scrollTop = consoleBox.scrollHeight;
   }
@@ -94,10 +116,8 @@ async function loadBots() {
 
 async function summonBot() {
   const name = document.getElementById('summonName').value.trim();
-  const host = document.getElementById('summonHost').value.trim();
-  const port = document.getElementById('summonPort').value.trim() || '29349';
-  const mode = document.getElementById('summonMode').value;
   const pass = document.getElementById('summonPass').value.trim();
+  const mode = document.getElementById('summonMode').value;
   const btn = document.getElementById('summonBtn');
   btn.disabled = true;
   btn.textContent = 'Summoning...';
@@ -107,8 +127,8 @@ async function summonBot() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: name,
-        host: host,
-        port: port,
+        host: serverHost || undefined,
+        port: serverPort || undefined,
         mode: mode,
         botPassword: pass || null,
         autoLogin: pass ? true : false
@@ -120,8 +140,6 @@ async function summonBot() {
       return;
     }
     document.getElementById('summonName').value = '';
-    document.getElementById('summonHost').value = '';
-    document.getElementById('summonPort').value = '';
     document.getElementById('summonPass').value = '';
     loadBots();
   } catch (e) {
@@ -175,6 +193,94 @@ async function sendChat(name) {
   }
 }
 
+async function setAutoChat(name) {
+  const input = document.getElementById('autoChatInput-' + escapeJs(name));
+  const message = input.value.trim();
+  if (!message) return;
+  input.disabled = true;
+  try {
+    const res = await fetch(BASE + '/api/bots/' + encodeURIComponent(name) + '/autochat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: message })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || 'Failed to set auto-chat');
+      return;
+    }
+    input.value = '';
+    loadBots();
+  } catch (e) {
+    alert('Request failed: ' + e.message);
+  } finally {
+    input.disabled = false;
+  }
+}
+
+async function setSpam(name) {
+  const input = document.getElementById('spamInput-' + escapeJs(name));
+  const intervalInput = document.getElementById('spamIntervalInput-' + escapeJs(name));
+  const message = input.value.trim();
+  const intervalMs = parseInt(intervalInput.value) || 30000;
+  if (!message) return;
+  input.disabled = true;
+  intervalInput.disabled = true;
+  try {
+    const res = await fetch(BASE + '/api/bots/' + encodeURIComponent(name) + '/spam', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: message, intervalMs: intervalMs })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || 'Failed to set spam');
+      return;
+    }
+    input.value = '';
+    loadBots();
+  } catch (e) {
+    alert('Request failed: ' + e.message);
+  } finally {
+    input.disabled = false;
+    intervalInput.disabled = false;
+  }
+}
+
+async function bulkSummon() {
+  const count = document.getElementById('bulkCount').value.trim();
+  const prefix = document.getElementById('bulkPrefix').value.trim() || 'TestBot';
+  const pass = document.getElementById('bulkPass').value.trim();
+  const btn = document.querySelector('button[onclick="bulkSummon()"]');
+  btn.disabled = true;
+  btn.textContent = 'Summoning...';
+  try {
+    const res = await fetch(BASE + '/api/bots/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        count: count,
+        prefix: prefix,
+        botPassword: pass || null,
+        autoLogin: pass ? true : false
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || 'Bulk summon failed');
+      return;
+    }
+    const data = await res.json();
+    alert('Summoned ' + data.summoned + ' bots' + (data.errors.length > 0 ? ' (' + data.errors.length + ' failed)' : ''));
+    loadBots();
+  } catch (e) {
+    alert('Request failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Bulk Summon Bots';
+  }
+}
+
 function escapeHtml(text) {
   if (!text) return '';
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -186,5 +292,6 @@ function escapeJs(text) {
 
 document.getElementById('summonBtn').addEventListener('click', summonBot);
 setupModePills();
+loadConfig();
 loadBots();
 setInterval(loadBots, 5000);

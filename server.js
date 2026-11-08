@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { createBot, listBots, getBot, removeBot, setMode, botChat, DEFAULT_CONFIG } = require('./bots');
+const { createBot, listBots, getBot, removeBot, setMode, botChat, setAutoChat, setSpam, DEFAULT_CONFIG } = require('./bots');
 const { pingServer } = require('./keepalive-pinger');
 
 const app = express();
@@ -12,10 +12,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Optional default bot from env (only needed if you want a real bot in tab list)
-const defaultHost = process.env.MC_HOST;
-const defaultPort = parseInt(process.env.MC_PORT) || 25565;
+// Pre-configured server from .env (so website doesn't need to type host/port)
+const defaultHost = process.env.MC_HOST || '';
+const defaultPort = parseInt(process.env.MC_PORT) || 29349;
 const defaultName = process.env.BOT_NAME || 'KeepAliveBot';
+
+// Optional default bot
 if (defaultHost) {
   try {
     createBot(defaultName, defaultHost, defaultPort, DEFAULT_CONFIG);
@@ -26,9 +28,8 @@ if (defaultHost) {
 }
 
 // Auto ping your Minecraft server from Render so the host sees activity.
-// Disabled by default; enable with AUTO_PING_SERVER=true
 const AUTO_PING = process.env.AUTO_PING_SERVER === 'true';
-const PING_INTERVAL_MS = parseInt(process.env.PING_INTERVAL_MS) || 180000; // 3 minutes
+const PING_INTERVAL_MS = parseInt(process.env.PING_INTERVAL_MS) || 180000;
 
 let lastPing = { ok: null, time: null, error: null };
 
@@ -50,19 +51,32 @@ if (AUTO_PING && defaultHost) {
   console.log('[web] Auto-ping enabled for ' + defaultHost + ':' + defaultPort);
 }
 
+// Expose server config to frontend so host/port are pre-filled
+app.get('/api/config', function (req, res) {
+  res.json({
+    host: defaultHost,
+    port: defaultPort
+  });
+});
+
 // List all bots
 app.get('/api/bots', function (req, res) {
   res.json(listBots());
 });
 
-// Summon a new real-feeling player bot
+// Summon a new bot (host/port optional - uses env defaults if omitted)
 app.post('/api/bots', function (req, res) {
   const { name, host, port, mode, maxBots, botPassword, autoLogin } = req.body;
-  if (!name || !host) {
-    return res.status(400).json({ error: 'name and host are required' });
+  if (!name) {
+    return res.status(400).json({ error: 'bot name is required' });
+  }
+  const resolvedHost = host || defaultHost;
+  const resolvedPort = port || defaultPort;
+  if (!resolvedHost) {
+    return res.status(400).json({ error: 'no server host configured' });
   }
   try {
-    const status = createBot(name, host, parseInt(port) || 25565, {
+    const status = createBot(name, resolvedHost, parseInt(resolvedPort) || 25565, {
       mode: mode || 'idle',
       maxBots: maxBots || DEFAULT_CONFIG.maxBots,
       botPassword: botPassword || null,
@@ -74,6 +88,42 @@ app.post('/api/bots', function (req, res) {
   }
 });
 
+// Bulk summon multiple bots with different modes for stress testing
+app.post('/api/bots/bulk', function (req, res) {
+  const { count, host, port, mode, botPassword, autoLogin, prefix } = req.body;
+  const countNum = parseInt(count) || 1;
+  if (countNum < 1 || countNum > 99) {
+    return res.status(400).json({ error: 'count must be between 1 and 99' });
+  }
+  const resolvedHost = host || defaultHost;
+  const resolvedPort = port || defaultPort;
+  if (!resolvedHost) {
+    return res.status(400).json({ error: 'no server host configured' });
+  }
+
+  const modes = ['idle', 'wander', 'chat'];
+  const results = [];
+  const errors = [];
+
+  for (let i = 0; i < countNum; i++) {
+    const botName = (prefix || 'TestBot') + '_' + (i + 1);
+    const botMode = mode || modes[i % modes.length];
+    try {
+      const status = createBot(botName, resolvedHost, parseInt(resolvedPort) || 25565, {
+        mode: botMode,
+        maxBots: 99,
+        botPassword: botPassword || null,
+        autoLogin: autoLogin !== undefined ? autoLogin : true
+      });
+      results.push(status);
+    } catch (e) {
+      errors.push({ name: botName, error: e.message });
+    }
+  }
+
+  res.status(201).json({ summoned: results.length, bots: results, errors: errors });
+});
+
 // Get single bot status
 app.get('/api/bots/:name', function (req, res) {
   const b = getBot(req.params.name);
@@ -81,7 +131,7 @@ app.get('/api/bots/:name', function (req, res) {
   res.json(b);
 });
 
-// Change bot mode (idle / wander / chat)
+// Change bot mode
 app.patch('/api/bots/:name/mode', function (req, res) {
   const { mode } = req.body;
   if (!mode) return res.status(400).json({ error: 'mode required' });
@@ -105,8 +155,30 @@ app.post('/api/bots/:name/chat', function (req, res) {
   const { message } = req.body;
   if (!message) return res.status(400).json({ error: 'message required' });
   try {
-    botChat(req.params.name, message);
-    res.json({ ok: true });
+    const result = botChat(req.params.name, message);
+    res.json({ ok: true, sent: result.sent });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Set auto-chat on join message
+app.post('/api/bots/:name/autochat', function (req, res) {
+  const { message } = req.body;
+  try {
+    const result = setAutoChat(req.params.name, message);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Set spam message
+app.post('/api/bots/:name/spam', function (req, res) {
+  const { message, intervalMs } = req.body;
+  try {
+    const result = setSpam(req.params.name, message, intervalMs);
+    res.json({ ok: true, ...result });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
