@@ -1,0 +1,6 @@
+name: FakePlayers
+version: 1.0.0
+main: com.dgjjsjn.fakeplayers.FakePlayersPlugin
+api-version: 1.20
+description: Fakes player count in server list and pings keepalive website to stay awake.
+author: dgjjsjn
