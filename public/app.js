@@ -4,6 +4,7 @@ let serverHost = '';
 let serverPort = '';
 let botCards = {};
 let isPolling = true;
+let pollTimer = null;
 
 const RANDOM_NAMES = [
   "wembo","Player1","Noob","ProGamer","XxSlayer","Bot99","Creeper","Steve","Alex",
@@ -43,16 +44,18 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString();
 }
 
+function escapeHtml(t){if(!t)return'';return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escapeJs(t){return String(t).replace(/'/g,"\\'").replace(/\\/g,'\\\\');}
+
 async function loadConfig() {
   try {
     const r = await fetch(BASE + '/api/config');
     const c = await r.json();
     serverHost = c.host || ''; serverPort = c.port || '';
     const h = document.getElementById('dashHost'); const p = document.getElementById('dashPort');
+    const th = document.getElementById('testHost'); const tp = document.getElementById('testPort');
     if (h) h.textContent = serverHost || 'Not configured';
     if (p) p.textContent = serverPort || 'Not configured';
-    // Auto-fill test fields
-    const th = document.getElementById('testHost'); const tp = document.getElementById('testPort');
     if (th && serverHost) th.value = serverHost;
     if (tp && serverPort) tp.value = serverPort;
   } catch(e) { console.error('config load failed', e); }
@@ -73,7 +76,7 @@ async function testConnection() {
     });
     const data = await resp.json();
     if (data.ok) {
-      result.innerHTML = '<div class="console-line command">✓ CONNECTED to ' + data.host + ':' + data.port + '</div><div class="console-line info">Response: ' + (data.result || 'OK') + '</div>';
+      result.innerHTML = '<div class="console-line command">✓ CONNECTED to ' + data.host + ':' + data.port + '</div><div class="console-line info">Server responded successfully</div>';
     } else {
       result.innerHTML = '<div class="console-line error">✗ FAILED to connect to ' + data.host + ':' + data.port + '</div><div class="console-line error">Error: ' + data.error + '</div>';
     }
@@ -83,9 +86,6 @@ async function testConnection() {
   btn.disabled = false; btn.textContent = 'Test Connection';
 }
 
-function escapeHtml(t){if(!t)return'';return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function escapeJs(t){return String(t).replace(/'/g,"\\'").replace(/\\/g,'\\\\');}
-
 function createBotCardHTML(b) {
   const live = b.connected;
   const dotClass = live ? 'live' : 'dead';
@@ -94,7 +94,7 @@ function createBotCardHTML(b) {
   const pos = b.position ? ' • ' + Math.round(b.position.x)+','+Math.round(b.position.y)+','+Math.round(b.position.z) : '';
   let logs = '';
   if (b.consoleLogs && b.consoleLogs.length) {
-    logs = b.consoleLogs.slice(-6).map(l =>
+    logs = b.consoleLogs.slice(-5).map(l =>
       '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
     ).join('');
   }
@@ -173,7 +173,7 @@ async function loadBots() {
         }
         const cb = c.querySelector('#console-'+escapeJs(b.name));
         if (cb && b.consoleLogs && b.consoleLogs.length) {
-          const nl = b.consoleLogs.slice(-6).map(l =>
+          const nl = b.consoleLogs.slice(-5).map(l =>
             '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
           ).join('');
           if (cb.innerHTML !== nl) { cb.innerHTML = nl; cb.scrollTop = cb.scrollHeight; }
@@ -182,6 +182,19 @@ async function loadBots() {
     }
     for (const n of Object.keys(botCards)) if (!current.has(n)) { botCards[n].remove(); delete botCards[n]; }
   } catch(e) { console.error('loadBots error', e); }
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch(BASE + '/api/stats');
+    const s = await r.json();
+    const onlineEl = document.getElementById('statsOnline');
+    const totalEl = document.getElementById('statsTotal');
+    const loggedEl = document.getElementById('statsLoggedIn');
+    if (onlineEl) onlineEl.textContent = s.online;
+    if (totalEl) totalEl.textContent = s.total;
+    if (loggedEl) loggedEl.textContent = s.loggedIn;
+  } catch(e) { console.error('loadStats error', e); }
 }
 
 async function summonBot() {
@@ -197,7 +210,7 @@ async function summonBot() {
     });
     if (!r.ok) { const e = await r.json(); alert(e.error||'Failed'); return; }
     document.getElementById('summonName').value=''; document.getElementById('summonPass').value='';
-    loadBots();
+    loadBots(); loadStats();
   } catch(e) { alert('Failed: '+e.message); } finally { btn.disabled=false; btn.textContent='Summon Bot'; }
 }
 
@@ -232,7 +245,7 @@ async function setAutoChat(n) {
   try {
     const r = await fetch(BASE + '/api/bots/'+encodeURIComponent(n)+'/autochat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
     if(!r.ok){const e=await r.json(); alert(e.error||'Failed'); return;}
-    i.value=''; loadBots();
+    i.value=''; loadBots(); loadStats();
   }catch(e){alert('Failed: '+e.message);} finally{i.disabled=false;}
 }
 async function setSpam(n) {
@@ -266,7 +279,7 @@ async function bulkSummon() {
     progressBar.style.width='100%';
     progressText.textContent='Summoned '+d.summoned+'/'+d.requested+' bots'+(d.errors.length?' ('+d.errors.length+' failed)':'');
     alert('Summoned '+d.summoned+'/'+d.requested+' bots'+(d.errors.length?' ('+d.errors.length+' failed)':''));
-    loadBots();
+    loadBots(); loadStats();
   }catch(e){alert('Failed: '+e.message);} finally{
     btn.disabled=false; btn.textContent='Bulk Summon Bots';
     setTimeout(()=>{progress.style.display='none';}, 2000);
@@ -277,4 +290,5 @@ document.getElementById('summonBtn').addEventListener('click', summonBot);
 setupModePills();
 loadConfig();
 loadBots();
-setInterval(loadBots, 5000);
+loadStats();
+setInterval(()=>{ loadBots(); loadStats(); }, 4000);

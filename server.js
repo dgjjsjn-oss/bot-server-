@@ -54,6 +54,13 @@ app.get('/api/bots', function (req, res) {
   res.json(listBots());
 });
 
+app.get('/api/stats', function (req, res) {
+  const bots = listBots();
+  const online = bots.filter(b => b.connected).length;
+  const loggedIn = bots.filter(b => b.loggedIn).length;
+  res.json({ total: bots.length, online: online, loggedIn: loggedIn, lastPing });
+});
+
 app.post('/api/bots', function (req, res) {
   const { name, host, port, mode, maxBots, botPassword, autoLogin } = req.body;
   if (!name) return res.status(400).json({ error: 'bot name required' });
@@ -104,7 +111,7 @@ app.post('/api/bots/bulk', async function (req, res) {
       errors.push({ name: botName, error: e.message });
     }
     if (i < countNum - 1) {
-      await sleep(500);
+      await sleep(300);
     }
   }
 
