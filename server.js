@@ -12,21 +12,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Pre-configured server from .env
 const defaultHost = process.env.MC_HOST || '';
 const defaultPort = parseInt(process.env.MC_PORT) || 29349;
 let defaultName = process.env.BOT_NAME || 'KeepAliveBot';
 
 if (defaultHost) {
   try {
-    createBot(defaultName || 'KeepAliveBot', defaultHost, defaultPort, DEFAULT_CONFIG);
+    createBot(defaultName, defaultHost, defaultPort, DEFAULT_CONFIG);
     console.log('[web] Default bot created');
   } catch (e) {
     console.error('[web] Default bot failed:', e.message);
   }
 }
 
-// Auto ping Render keepalive
 const AUTO_PING = process.env.AUTO_PING_SERVER === 'true';
 const PING_INTERVAL_MS = parseInt(process.env.PING_INTERVAL_MS) || 180000;
 let lastPing = { ok: null, time: null, error: null };
@@ -48,17 +46,14 @@ if (AUTO_PING && defaultHost) {
   doPing();
 }
 
-// Config for frontend
 app.get('/api/config', function (req, res) {
   res.json({ host: defaultHost, port: defaultPort });
 });
 
-// List bots
 app.get('/api/bots', function (req, res) {
   res.json(listBots());
 });
 
-// Single bot summon
 app.post('/api/bots', function (req, res) {
   const { name, host, port, mode, maxBots, botPassword, autoLogin } = req.body;
   if (!name) return res.status(400).json({ error: 'bot name required' });
@@ -78,8 +73,7 @@ app.post('/api/bots', function (req, res) {
   }
 });
 
-// Bulk summon - all same type, random names if no prefix
-app.post('/api/bots/bulk', function (req, res) {
+app.post('/api/bots/bulk', async function (req, res) {
   const { count, host, port, mode, botPassword, autoLogin, prefix, randomNames } = req.body;
   const countNum = Math.min(Math.max(parseInt(count) || 1, 1), 99);
   const h = host || defaultHost;
@@ -107,36 +101,33 @@ app.post('/api/bots/bulk', function (req, res) {
     } catch (e) {
       errors.push({ name: botName, error: e.message });
     }
+    // Stagger connections by 1 second so server doesn't get overwhelmed
+    if (i < countNum - 1) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 
   res.status(201).json({ summoned: results.length, requested: countNum, bots: results, errors: errors });
 });
 
-// Get single bot
 app.get('/api/bots/:name', function (req, res) {
   const b = getBot(req.params.name);
   if (!b) return res.status(404).json({ error: 'Bot not found' });
   res.json(b);
 });
 
-// Change mode
 app.patch('/api/bots/:name/mode', function (req, res) {
   const { mode } = req.body;
   if (!mode) return res.status(400).json({ error: 'mode required' });
-  try {
-    res.json(setMode(req.params.name, mode));
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
+  try { res.json(setMode(req.params.name, mode)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// Kick bot
 app.delete('/api/bots/:name', function (req, res) {
   if (removeBot(req.params.name)) res.json({ ok: true });
   else res.status(404).json({ error: 'Bot not found' });
 });
 
-// Send chat
 app.post('/api/bots/:name/chat', function (req, res) {
   const { message } = req.body;
   if (!message) return res.status(400).json({ error: 'message required' });
@@ -148,34 +139,23 @@ app.post('/api/bots/:name/chat', function (req, res) {
   }
 });
 
-// Auto chat
 app.post('/api/bots/:name/autochat', function (req, res) {
   const { message } = req.body;
-  try {
-    res.json({ ok: true, ...setAutoChat(req.params.name, message) });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
+  try { res.json({ ok: true, ...setAutoChat(req.params.name, message) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// Spam
 app.post('/api/bots/:name/spam', function (req, res) {
   const { message, intervalMs } = req.body;
-  try {
-    res.json({ ok: true, ...setSpam(req.params.name, message, intervalMs) });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
+  try { res.json({ ok: true, ...setSpam(req.params.name, message, intervalMs) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// Ping
 app.post('/api/ping-server', async function (req, res) {
   await doPing();
   res.json(lastPing);
 });
-app.get('/api/ping-server', function (req, res) {
-  res.json(lastPing);
-});
+app.get('/api/ping-server', function (req, res) { res.json(lastPing); });
 
 app.get('/ping', function (req, res) { res.send('pong'); });
 app.get('/status', function (req, res) {
