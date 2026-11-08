@@ -57,14 +57,16 @@ app.get('/api/bots', function (req, res) {
 
 // Summon a new real-feeling player bot
 app.post('/api/bots', function (req, res) {
-  const { name, host, port, mode, maxBots } = req.body;
+  const { name, host, port, mode, maxBots, botPassword, autoLogin } = req.body;
   if (!name || !host) {
     return res.status(400).json({ error: 'name and host are required' });
   }
   try {
     const status = createBot(name, host, parseInt(port) || 25565, {
       mode: mode || 'idle',
-      maxBots: maxBots || DEFAULT_CONFIG.maxBots
+      maxBots: maxBots || DEFAULT_CONFIG.maxBots,
+      botPassword: botPassword || null,
+      autoLogin: autoLogin !== undefined ? autoLogin : true
     });
     res.status(201).json(status);
   } catch (e) {

@@ -28,16 +28,19 @@ async function loadBots() {
     item.className = 'bot-item';
     const dotClass = b.connected ? 'live' : 'dead';
     const statusText = b.connected ? 'online' : 'offline';
+    const loginText = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
     const pos = b.position ? (' • ' + Math.round(b.position.x) + ',' + Math.round(b.position.y) + ',' + Math.round(b.position.z)) : '';
     item.innerHTML =
+      '<div class="bot-header">' +
       '<div>' +
       '<span class="bot-name">' + escapeHtml(b.name) + '</span>' +
       '<div class="bot-status ' + (b.connected ? 'status-ok' : 'status-bad') + '">' +
-      '<span class="dot ' + dotClass + '"></span>' + statusText +
+      '<span class="dot ' + dotClass + '"></span>' + statusText + loginText +
       ' • mode: ' + escapeHtml(b.mode) +
       ' • ' + b.host + ':' + b.port + pos +
       (b.lastActivity ? ' • last activity: ' + new Date(b.lastActivity).toLocaleString() : '') +
       (b.error ? ' • error: ' + escapeHtml(b.error) : '') +
+      '</div>' +
       '</div>' +
       '</div>' +
       '<div class="controls">' +
@@ -45,7 +48,7 @@ async function loadBots() {
       '<button class="secondary" onclick="setModeBot(\'' + escapeJs(b.name) + '\', \'wander\')">Wander</button>' +
       '<button class="danger" onclick="kickBot(\'' + escapeJs(b.name) + '\')">Kick</button>' +
       '</div>' +
-      '<div class="chat-row" style="margin-top:8px;">' +
+      '<div class="chat-row">' +
       '<input type="text" id="chatInput-' + escapeJs(b.name) + '" placeholder="Say something...">' +
       '<button onclick="sendChat(\'' + escapeJs(b.name) + '\')">Chat</button>' +
       '</div>';
@@ -56,8 +59,9 @@ async function loadBots() {
 async function summonBot() {
   const name = document.getElementById('summonName').value.trim();
   const host = document.getElementById('summonHost').value.trim();
-  const port = document.getElementById('summonPort').value.trim() || '25565';
+  const port = document.getElementById('summonPort').value.trim() || '29349';
   const mode = document.getElementById('summonMode').value;
+  const pass = document.getElementById('summonPass').value.trim();
   const btn = document.getElementById('summonBtn');
   btn.disabled = true;
   btn.textContent = 'Summoning...';
@@ -65,7 +69,14 @@ async function summonBot() {
     const res = await fetch(BASE + '/api/bots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, host: host, port: port, mode: mode })
+      body: JSON.stringify({
+        name: name,
+        host: host,
+        port: port,
+        mode: mode,
+        botPassword: pass || null,
+        autoLogin: pass ? true : false
+      })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -75,6 +86,7 @@ async function summonBot() {
     document.getElementById('summonName').value = '';
     document.getElementById('summonHost').value = '';
     document.getElementById('summonPort').value = '';
+    document.getElementById('summonPass').value = '';
     loadBots();
   } catch (e) {
     alert('Request failed: ' + e.message);

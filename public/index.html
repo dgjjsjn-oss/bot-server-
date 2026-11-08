@@ -22,7 +22,8 @@
   button.secondary:hover { background: #334155; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   .bot-list { margin-top: 12px; }
-  .bot-item { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .bot-item { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .bot-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .bot-name { font-weight: 700; color: #38bdf8; }
   .bot-status { font-size: 12px; font-family: ui-monospace, monospace; }
   .status-ok { color: #34d399; }
@@ -30,16 +31,17 @@
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
   .dot.live { background: #34d399; box-shadow: 0 0 8px #34d399; }
   .dot.dead { background: #f87171; box-shadow: 0 0 8px #f87171; }
-  .controls { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
   .controls button { width: auto; flex: 1; min-width: 70px; }
-  .chat-row { display: flex; gap: 8px; margin-top: 8px; }
+  .chat-row { display: flex; gap: 8px; }
   .chat-row input { margin-bottom: 0; flex: 1; }
   .chat-row button { width: auto; flex: none; }
-  .mode-pills { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .mode-pills { display: flex; gap: 6px; flex-wrap: wrap; }
   .mode-pill { padding: 4px 10px; border-radius: 20px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 12px; cursor: pointer; }
   .mode-pill.active { border-color: #3b82f6; color: #38bdf8; }
-  .hint { margin-top: 14px; font-size: 12px; color: #64748b; line-height: 1.5; }
+  .hint { margin-top: 10px; font-size: 12px; color: #64748b; line-height: 1.5; }
   .empty { color: #64748b; font-style: italic; margin-top: 20px; text-align: center; }
+  .pos { font-size: 11px; color: #94a3b8; font-family: ui-monospace, monospace; }
 </style>
 </head>
 <body>
@@ -47,21 +49,23 @@
   <div class="card">
     <h1><span class="dot live"></span>Bot Control Panel</h1>
     <h2>Summon a real player bot</h2>
-    <label>Bot name (any name, e.g. YouTuber)</label>
+    <label>Bot name (any name, e.g. wembo)</label>
     <input type="text" id="summonName" placeholder="wembo">
     <label>Server host (IP or domain)</label>
-    <input type="text" id="summonHost" placeholder="mc.example.aternos.me">
+    <input type="text" id="summonHost" placeholder="dogpvp.falix.gg">
     <label>Port</label>
-    <input type="text" id="summonPort" placeholder="25565">
+    <input type="text" id="summonPort" placeholder="29349">
+    <label>Login password (for AuthMe/LoginSecurity)</label>
+    <input type="text" id="summonPass" placeholder="leave empty if none">
     <label>Behavior mode</label>
     <div class="mode-pills">
       <div class="mode-pill active" data-mode="idle">Idle (no lag)</div>
-      <div class="mode-pill" data-mode="wander">Wander</div>
-      <div class="mode-pill" data-mode="chat">Chat</div>
+      <div class="mode-pill" data-mode="wander">Wander + jump</div>
+      <div class="mode-pill" data-mode="chat">Chat only</div>
     </div>
     <input type="hidden" id="summonMode" value="idle">
     <button id="summonBtn">Summon bot</button>
-    <p class="hint">Bots join with no Minecraft account and appear in the server Tab list like real players. Use Idle mode to avoid lag.</p>
+    <p class="hint">Bot joins with no Minecraft account. If your server uses AuthMe/LoginSecurity, set the password so the bot can auto-login.</p>
   </div>
 
   <div class="card">
