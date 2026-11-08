@@ -1,5 +1,4 @@
 const mineflayer = require('mineflayer');
-const { vec3 } = require('vec3');
 
 const bots = new Map();
 
@@ -13,16 +12,16 @@ const DEFAULT_CONFIG = {
   maxBots: 99,
   autoLogin: true,
   botPassword: null,
-  loginDelayMs: 5000,
+  loginDelayMs: 6000,
   reconnectDelayMs: 8000,
-  version: '1.21.11',
+  version: false,  // Don't force version - let Mineflayer auto-detect
   autoReply: true,
   replyChance: 0.5,
   maxConsoleLogs: 80,
   autoChatOnJoin: null,
   spamMessage: null,
   spamIntervalMs: 30000,
-  staggerDelayMs: 500,
+  staggerDelayMs: 300,
   randomBehavior: true
 };
 
@@ -102,11 +101,16 @@ function createBot(name, host, port, config = {}) {
 
   let bot = null, keepaliveInterval=null, wanderInterval=null, jumpInterval=null;
   let lookInterval=null, spamInterval=null, reconnectTimeout=null;
-  const entry = { status, config: merged, _botInstance: bot, consoleLogs: [], hasRegistered: false, hasLoggedIn: false };
+  const entry = { status, config: merged, _botInstance: bot, consoleLogs: [], hasRegistered: false };
 
   function createInstance() {
     try {
-      bot = mineflayer.createBot({ host, port, username: name, version: merged.version });
+      bot = mineflayer.createBot({
+        host: host,
+        port: port,
+        username: name,
+        version: false  // Critical: don't force version, let Mineflayer auto-detect
+      });
     } catch(e) {
       status.error = e.message;
       addConsoleLog(entry, 'error', 'Create failed: ' + e.message);
@@ -151,7 +155,7 @@ function createBot(name, host, port, config = {}) {
     botInstance.on('end', () => {
       status.connected=false; status.loggedIn=false;
       stopKeepalive(entry); stopWander(entry); stopJump(entry); stopLook(entry); stopSpam(entry);
-      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting in 8s...');
+      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
       console.log('[bot:' + name + '] Disconnected');
       scheduleReconnect(entry);
     });
@@ -271,7 +275,7 @@ function createBot(name, host, port, config = {}) {
 function listBots(){
   const out=[];
   for(const [name,entry] of bots.entries()){
-    out.push({name:entry.status.name,connected:entry.status.connected,loggedIn:entry.status.loggedIn,host:entry.status.host,port:entry.status.port,mode:entry.status.mode,lastActivity:entry.status.lastActivity,error:entry.status.error,position:entry.status.position,consoleLogs:entry.consoleLogs.slice(-10),autoChatOnJoin:entry.config.autoChatOnJoin,spamMessage:entry.config.spamMessage,spamIntervalMs:entry.config.spamIntervalMs});
+    out.push({name:entry.status.name,connected:entry.status.connected,loggedIn:entry.status.loggedIn,host:entry.status.host,port:entry.status.port,mode:entry.status.mode,lastActivity:entry.status.lastActivity,error:entry.status.error,position:entry.status.position,consoleLogs:entry.consoleLogs.slice(-20),autoChatOnJoin:entry.config.autoChatOnJoin,spamMessage:entry.config.spamMessage,spamIntervalMs:entry.config.spamIntervalMs});
   }
   return out;
 }
