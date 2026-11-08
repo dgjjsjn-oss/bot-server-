@@ -100,7 +100,7 @@ app.delete('/api/bots/:name', function (req, res) {
   res.json({ ok: true });
 });
 
-// Send chat from a bot
+// Send chat/command from a bot
 app.post('/api/bots/:name/chat', function (req, res) {
   const { message } = req.body;
   if (!message) return res.status(400).json({ error: 'message required' });

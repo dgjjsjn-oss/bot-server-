@@ -4,49 +4,44 @@ const { vec3 } = require('vec3');
 const bots = new Map();
 
 const DEFAULT_CONFIG = {
-  mode: 'idle',            // 'idle' | 'wander' | 'chat'
+  mode: 'idle',
   keepalive: true,
   keepaliveIntervalMs: 120000,
   wanderIntervalMs: 15000,
-  jumpIntervalMs: 20000,   // jump occasionally to look alive
-  lookIntervalMs: 5000,    // look around randomly
+  jumpIntervalMs: 20000,
+  lookIntervalMs: 5000,
   maxBots: 10,
   autoLogin: true,
   botPassword: null,
   loginDelayMs: 5000,
   reconnectDelayMs: 15000,
   version: '1.21.11',
-  autoReply: true,         // auto-reply to chat messages
-  replyChance: 0.7         // 70% chance to reply when someone talks
+  autoReply: true,
+  replyChance: 0.7,
+  maxConsoleLogs: 100
 };
 
-// Simple auto-reply responses so the bot feels like a real player
 const AUTO_REPLIES = [
-  "yo",
-  "hi",
-  "hello",
-  "sup",
-  "what's up",
-  "im just playing",
-  "cool server",
-  "nice",
-  "lol",
-  "haha",
-  "im afk for a sec",
-  "brb",
-  "gg",
-  "wp",
-  "good game",
-  "lets go",
-  "im here",
-  "what?",
-  "where?",
-  "how?",
-  "who is there?"
+  "yo", "hi", "hello", "sup", "what's up", "im just playing",
+  "cool server", "nice", "lol", "haha", "im afk for a sec",
+  "brb", "gg", "wp", "good game", "lets go", "im here",
+  "what?", "where?", "how?", "who is there?"
 ];
 
 function getRandomReply() {
   return AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
+}
+
+function addConsoleLog(entry, type, message) {
+  const log = {
+    time: new Date().toISOString(),
+    type: type, // 'info', 'chat', 'command', 'error', 'system'
+    message: message
+  };
+  entry.consoleLogs.push(log);
+  if (entry.consoleLogs.length > entry.config.maxConsoleLogs) {
+    entry.consoleLogs.shift();
+  }
 }
 
 function createBot(name, host, port, config = {}) {
@@ -78,6 +73,13 @@ function createBot(name, host, port, config = {}) {
   let lookInterval = null;
   let reconnectTimeout = null;
 
+  const entry = {
+    status: status,
+    config: merged,
+    _botInstance: bot,
+    consoleLogs: []
+  };
+
   function createInstance() {
     try {
       bot = mineflayer.createBot({
@@ -88,19 +90,23 @@ function createBot(name, host, port, config = {}) {
       });
     } catch (e) {
       status.error = e.message;
+      addConsoleLog(entry, 'error', 'Create failed: ' + e.message);
       console.error('[bot:' + name + '] Create failed:', e.message);
-      scheduleReconnect();
+      scheduleReconnect(entry);
       return;
     }
 
-    wireEvents(bot);
+    entry._botInstance = bot;
+    addConsoleLog(entry, 'system', 'Bot instance created, connecting to ' + host + ':' + port);
+    wireEvents(entry, bot);
   }
 
-  function wireEvents(botInstance) {
+  function wireEvents(entry, botInstance) {
     botInstance.on('login', function () {
       status.connected = true;
       status.lastActivity = new Date().toISOString();
       status.error = null;
+      addConsoleLog(entry, 'info', 'Logged in to server');
       console.log('[bot:' + name + '] Logged in to server');
     });
 
@@ -109,48 +115,54 @@ function createBot(name, host, port, config = {}) {
       status.position = botInstance.entity
         ? { x: botInstance.entity.position.x, y: botInstance.entity.position.y, z: botInstance.entity.position.z }
         : status.position;
-      startKeepalive();
-      startWander();
-      startJump();
-      startLook();
+      startKeepalive(entry);
+      startWander(entry);
+      startJump(entry);
+      startLook(entry);
 
       if (merged.autoLogin && merged.botPassword) {
         setTimeout(function () {
           if (botInstance && botInstance.isChatAvailable()) {
             botInstance.chat('/login ' + merged.botPassword);
+            addConsoleLog(entry, 'command', '/login ****');
             console.log('[bot:' + name + '] Sent /login');
           }
         }, merged.loginDelayMs);
       }
 
+      addConsoleLog(entry, 'info', 'Spawned in world');
       console.log('[bot:' + name + '] Spawned');
     });
 
     botInstance.on('end', function () {
       status.connected = false;
       status.loggedIn = false;
-      stopKeepalive();
-      stopWander();
-      stopJump();
-      stopLook();
+      stopKeepalive(entry);
+      stopWander(entry);
+      stopJump(entry);
+      stopLook(entry);
+      addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
       console.log('[bot:' + name + '] Disconnected. Reconnecting...');
-      scheduleReconnect();
+      scheduleReconnect(entry);
     });
 
     botInstance.on('error', function (err) {
       status.error = err.message;
+      addConsoleLog(entry, 'error', err.message);
       console.error('[bot:' + name + '] Error:', err.message);
     });
 
     botInstance.on('chat', function (username, message) {
       if (username === name) return;
       status.lastActivity = new Date().toISOString();
+      addConsoleLog(entry, 'chat', '<' + username + '> ' + message);
 
-      // Auto-reply to players so the bot feels like a real player
       if (merged.autoReply && Math.random() < merged.replyChance) {
         setTimeout(function () {
           if (botInstance && botInstance.isChatAvailable() && status.loggedIn) {
-            botInstance.chat(getRandomReply());
+            const reply = getRandomReply();
+            botInstance.chat(reply);
+            addConsoleLog(entry, 'command', reply);
             console.log('[bot:' + name + '] Auto-replied to ' + username);
           }
         }, 1000 + Math.random() * 3000);
@@ -168,75 +180,80 @@ function createBot(name, host, port, config = {}) {
     });
   }
 
-  function scheduleReconnect() {
-    if (reconnectTimeout) clearTimeout(reconnectTimeout);
-    reconnectTimeout = setTimeout(function () {
+  function scheduleReconnect(entry) {
+    if (entry._reconnectTimeout) clearTimeout(entry._reconnectTimeout);
+    entry._reconnectTimeout = setTimeout(function () {
       if (bots.has(name)) {
+        addConsoleLog(entry, 'system', 'Attempting reconnect...');
         console.log('[bot:' + name + '] Attempting reconnect...');
         createInstance();
       }
     }, merged.reconnectDelayMs);
   }
 
-  function startKeepalive() {
-    if (!merged.keepalive || keepaliveInterval) return;
-    keepaliveInterval = setInterval(function () {
-      if (bot && bot.isChatAvailable() && status.loggedIn) {
-        bot.chat('keepalive');
+  function startKeepalive(entry) {
+    if (!merged.keepalive || entry._keepaliveInterval) return;
+    entry._keepaliveInterval = setInterval(function () {
+      const botRef = entry._botInstance;
+      if (botRef && botRef.isChatAvailable() && status.loggedIn) {
+        botRef.chat('keepalive');
         status.lastActivity = new Date().toISOString();
       }
     }, merged.keepaliveIntervalMs);
   }
 
-  function stopKeepalive() {
-    if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
+  function stopKeepalive(entry) {
+    if (entry._keepaliveInterval) { clearInterval(entry._keepaliveInterval); entry._keepaliveInterval = null; }
   }
 
-  function startWander() {
-    if (merged.mode !== 'wander' || wanderInterval) return;
-    wanderInterval = setInterval(function () {
-      if (!bot || !bot.entity) return;
-      const pos = bot.entity.position;
+  function startWander(entry) {
+    if (merged.mode !== 'wander' || entry._wanderInt) return;
+    entry._wanderInt = setInterval(function () {
+      if (!entry._botInstance || !entry._botInstance.entity) return;
+      const pos = entry._botInstance.entity.position;
       const offset = new vec3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8);
       const target = pos.offset(offset);
       try {
-        bot.pathfinder.setGoal(new (require('mineflayer-pathfinder').GoalNear)(target.x, target.y, target.z, 1));
+        entry._botInstance.pathfinder.setGoal(new (require('mineflayer-pathfinder').GoalNear)(target.x, target.y, target.z, 1));
+        addConsoleLog(entry, 'info', 'Walking to ' + Math.round(target.x) + ',' + Math.round(target.y) + ',' + Math.round(target.z));
       } catch (e) { /* skip movement silently */ }
       status.position = { x: pos.x, y: pos.y, z: pos.z };
       status.lastActivity = new Date().toISOString();
     }, merged.wanderIntervalMs);
   }
 
-  function stopWander() {
-    if (wanderInterval) { clearInterval(wanderInterval); wanderInterval = null; }
+  function stopWander(entry) {
+    if (entry._wanderInt) { clearInterval(entry._wanderInt); entry._wanderInt = null; }
   }
 
-  function startJump() {
-    if (merged.mode !== 'wander' || jumpInterval) return;
-    jumpInterval = setInterval(function () {
-      if (!bot || !bot.entity) return;
+  function startJump(entry) {
+    if (merged.mode !== 'wander' || entry._jumpInt) return;
+    entry._jumpInt = setInterval(function () {
+      if (!entry._botInstance || !entry._botInstance.entity) return;
       try {
-        bot.setControlState('jump', true);
+        entry._botInstance.setControlState('jump', true);
         setTimeout(function () {
-          if (bot) bot.setControlState('jump', false);
+          if (entry._botInstance) entry._botInstance.setControlState('jump', false);
         }, 500);
+        addConsoleLog(entry, 'info', 'Jumped');
       } catch (e) { /* skip */ }
     }, merged.jumpIntervalMs);
   }
 
-  function stopJump() {
-    if (jumpInterval) { clearInterval(jumpInterval); jumpInterval = null; }
-    if (bot) {
-      try { bot.setControlState('jump', false); } catch (e) { /* skip */ }
+  function stopJump(entry) {
+    if (entry._jumpInt) { clearInterval(entry._jumpInt); entry._jumpInt = null; }
+    const botRef = entry._botInstance;
+    if (botRef) {
+      try { botRef.setControlState('jump', false); } catch (e) { /* skip */ }
     }
   }
 
-  function startLook() {
-    if (merged.mode !== 'wander' || lookInterval) return;
-    lookInterval = setInterval(function () {
-      if (!bot || !bot.entity) return;
+  function startLook(entry) {
+    if (merged.mode !== 'wander' || entry._lookInt) return;
+    entry._lookInt = setInterval(function () {
+      if (!entry._botInstance || !entry._botInstance.entity) return;
       try {
-        bot.look(
+        entry._botInstance.look(
           Math.random() * Math.PI * 2,
           (Math.random() - 0.5) * Math.PI,
           true
@@ -245,17 +262,11 @@ function createBot(name, host, port, config = {}) {
     }, merged.lookIntervalMs);
   }
 
-  function stopLook() {
-    if (lookInterval) { clearInterval(lookInterval); lookInterval = null; }
+  function stopLook(entry) {
+    if (entry._lookInt) { clearInterval(entry._lookInt); entry._lookInt = null; }
   }
 
   createInstance();
-
-  const entry = {
-    status: status,
-    config: merged,
-    _botInstance: bot
-  };
 
   bots.set(name, entry);
 
@@ -274,7 +285,8 @@ function listBots() {
       mode: entry.status.mode,
       lastActivity: entry.status.lastActivity,
       error: entry.status.error,
-      position: entry.status.position
+      position: entry.status.position,
+      consoleLogs: entry.consoleLogs.slice(-20) // last 20 logs
     });
   }
   return out;
@@ -283,7 +295,10 @@ function listBots() {
 function getBot(name) {
   const entry = bots.get(name);
   if (!entry) return null;
-  return entry.status;
+  return {
+    ...entry.status,
+    consoleLogs: entry.consoleLogs.slice(-50)
+  };
 }
 
 function removeBot(name) {
@@ -304,74 +319,18 @@ function setMode(name, mode) {
   }
   entry.status.mode = mode;
   entry.config.mode = mode;
+  addConsoleLog(entry, 'system', 'Mode changed to ' + mode);
 
-  // Restart/stop movement behaviors based on new mode
   if (mode === 'wander') {
-    if (!entry.config.jumpInterval) entry.config.jumpInterval = DEFAULT_CONFIG.jumpIntervalMs;
-    if (!entry.config.lookInterval) entry.config.lookInterval = DEFAULT_CONFIG.lookIntervalMs;
-    startWanderFor(entry);
-    startJumpFor(entry);
-    startLookFor(entry);
+    startWander(entry);
+    startJump(entry);
+    startLook(entry);
   } else {
-    stopWanderFor(entry);
-    stopJumpFor(entry);
-    stopLookFor(entry);
+    stopWander(entry);
+    stopJump(entry);
+    stopLook(entry);
   }
   return { name: name, mode: mode };
-}
-
-function startWanderFor(entry) {
-  if (entry._wanderInt) return;
-  const merged = entry.config;
-  entry._wanderInt = setInterval(function () {
-    if (!entry._botInstance || !entry._botInstance.entity) return;
-    const pos = entry._botInstance.entity.position;
-    const offset = new vec3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8);
-    const target = pos.offset(offset);
-    try {
-      entry._botInstance.pathfinder.setGoal(new (require('mineflayer-pathfinder').GoalNear)(target.x, target.y, target.z, 1));
-    } catch (e) { /* skip */ }
-    entry.status.position = { x: pos.x, y: pos.y, z: pos.z };
-    entry.status.lastActivity = new Date().toISOString();
-  }, merged.wanderIntervalMs);
-}
-function stopWanderFor(entry) {
-  if (entry._wanderInt) { clearInterval(entry._wanderInt); entry._wanderInt = null; }
-}
-
-function startJumpFor(entry) {
-  if (entry._jumpInt) return;
-  const merged = entry.config;
-  entry._jumpInt = setInterval(function () {
-    if (!entry._botInstance || !entry._botInstance.entity) return;
-    try {
-      entry._botInstance.setControlState('jump', true);
-      setTimeout(function () {
-        if (entry._botInstance) entry._botInstance.setControlState('jump', false);
-      }, 500);
-    } catch (e) { /* skip */ }
-  }, merged.jumpIntervalMs);
-}
-function stopJumpFor(entry) {
-  if (entry._jumpInt) { clearInterval(entry._jumpInt); entry._jumpInt = null; }
-}
-
-function startLookFor(entry) {
-  if (entry._lookInt) return;
-  const merged = entry.config;
-  entry._lookInt = setInterval(function () {
-    if (!entry._botInstance || !entry._botInstance.entity) return;
-    try {
-      entry._botInstance.look(
-        Math.random() * Math.PI * 2,
-        (Math.random() - 0.5) * Math.PI,
-        true
-      );
-    } catch (e) { /* skip */ }
-  }, merged.lookIntervalMs);
-}
-function stopLookFor(entry) {
-  if (entry._lookInt) { clearInterval(entry._lookInt); entry._lookInt = null; }
 }
 
 function botChat(name, message) {
@@ -383,9 +342,15 @@ function botChat(name, message) {
   if (botRef && botRef.isChatAvailable()) {
     botRef.chat(message);
     entry.status.lastActivity = new Date().toISOString();
+    addConsoleLog(entry, 'command', message);
+    return { ok: true, sent: message };
   } else {
     throw new Error('Bot not ready for chat');
   }
+}
+
+function botCommand(name, command) {
+  return botChat(name, command); // same thing - send text to bot
 }
 
 module.exports = {
@@ -395,5 +360,6 @@ module.exports = {
   removeBot: removeBot,
   setMode: setMode,
   botChat: botChat,
+  botCommand: botCommand,
   DEFAULT_CONFIG: DEFAULT_CONFIG
 };

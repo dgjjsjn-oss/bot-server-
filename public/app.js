@@ -14,6 +14,25 @@ function setupModePills() {
   });
 }
 
+function consoleClass(type) {
+  switch (type) {
+    case 'error': return 'error';
+    case 'command': return 'command';
+    case 'chat': return 'chat';
+    case 'system': return 'system';
+    default: return 'info';
+  }
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString();
+  } catch (e) {
+    return iso;
+  }
+}
+
 async function loadBots() {
   const res = await fetch(BASE + '/api/bots');
   const bots = await res.json();
@@ -30,6 +49,18 @@ async function loadBots() {
     const statusText = b.connected ? 'online' : 'offline';
     const loginText = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
     const pos = b.position ? (' • ' + Math.round(b.position.x) + ',' + Math.round(b.position.y) + ',' + Math.round(b.position.z)) : '';
+
+    // Console logs HTML
+    let logsHtml = '';
+    if (b.consoleLogs && b.consoleLogs.length > 0) {
+      logsHtml = b.consoleLogs.map(function (log) {
+        return '<div class="console-line ' + consoleClass(log.type) + '">' +
+          '<span class="console-time">[' + formatTime(log.time) + ']</span>' +
+          escapeHtml(log.message) +
+          '</div>';
+      }).join('');
+    }
+
     item.innerHTML =
       '<div class="bot-header">' +
       '<div>' +
@@ -48,11 +79,16 @@ async function loadBots() {
       '<button class="secondary" onclick="setModeBot(\'' + escapeJs(b.name) + '\', \'wander\')">Wander</button>' +
       '<button class="danger" onclick="kickBot(\'' + escapeJs(b.name) + '\')">Kick</button>' +
       '</div>' +
+      '<div class="console-box" id="console-' + escapeJs(b.name) + '">' + logsHtml + '</div>' +
       '<div class="chat-row">' +
-      '<input type="text" id="chatInput-' + escapeJs(b.name) + '" placeholder="Say something...">' +
-      '<button onclick="sendChat(\'' + escapeJs(b.name) + '\')">Chat</button>' +
+      '<input type="text" id="chatInput-' + escapeJs(b.name) + '" placeholder="Type command or chat...">' +
+      '<button onclick="sendChat(\'' + escapeJs(b.name) + '\')">Send</button>' +
       '</div>';
     list.appendChild(item);
+
+    // Auto-scroll console to bottom
+    const consoleBox = document.getElementById('console-' + escapeJs(b.name));
+    if (consoleBox) consoleBox.scrollTop = consoleBox.scrollHeight;
   }
 }
 
@@ -128,7 +164,7 @@ async function sendChat(name) {
     });
     if (!res.ok) {
       const err = await res.json();
-      alert(err.error || 'Failed to send chat');
+      alert(err.error || 'Failed to send');
       return;
     }
     input.value = '';

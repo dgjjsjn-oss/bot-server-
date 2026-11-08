@@ -8,7 +8,8 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
   h1 { font-size: 22px; margin-bottom: 20px; letter-spacing: -0.02em; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
+  
   @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
   .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); }
   h2 { font-size: 16px; margin-bottom: 16px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -36,6 +37,14 @@
   .chat-row { display: flex; gap: 8px; }
   .chat-row input { margin-bottom: 0; flex: 1; }
   .chat-row button { width: auto; flex: none; }
+  .console-box { background: #020617; border: 1px solid #334155; border-radius: 8px; padding: 12px; font-family: ui-monospace, monospace; font-size: 11px; max-height: 300px; overflow-y: auto; margin-bottom: 10px; }
+  .console-line { margin: 2px 0; padding: 2px 4px; border-radius: 4px; white-space: pre-wrap; }
+  .console-line.info { color: #93c5fd; }
+  .console-line.chat { color: #a5f3fc; }
+  .console-line.command { color: #34d399; }
+  .console-line.error { color: #f87171; }
+  .console-line.system { color: #cbd5e1; }
+  .console-time { color: #64748b; margin-right: 8px; }
   .mode-pills { display: flex; gap: 6px; flex-wrap: wrap; }
   .mode-pill { padding: 4px 10px; border-radius: 20px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 12px; cursor: pointer; }
   .mode-pill.active { border-color: #3b82f6; color: #38bdf8; }
