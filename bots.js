@@ -13,11 +13,11 @@ const DEFAULT_CONFIG = {
   maxBots: 99,
   autoLogin: true,
   botPassword: null,
-  loginDelayMs: 5000,
+  loginDelayMs: 8000,
   reconnectDelayMs: 15000,
   version: '1.21.11',
   autoReply: true,
-  replyChance: 0.7,
+  replyChance: 0.5,
   maxConsoleLogs: 100,
   autoChatOnJoin: null,
   spamMessage: null,
@@ -28,8 +28,32 @@ const AUTO_REPLIES = [
   "yo", "hi", "hello", "sup", "what's up", "im just playing",
   "cool server", "nice", "lol", "haha", "im afk for a sec",
   "brb", "gg", "wp", "good game", "lets go", "im here",
-  "what?", "where?", "how?", "who is there?"
+  "what?", "where?", "how?", "who is there?", "aaa", "omg"
 ];
+
+const RANDOM_NAMES = [
+  "wembo", "Player1", "Noob", "ProGamer", "XxSlayer", "Bot99",
+  "Creeper", "Steve", "Alex", "Herobrine", "Notch", "Ghost",
+  "Ninja", "Shadow", "Viper", "Blaze", "Frost", "Ember", "Storm",
+  "Zenith", "Nova", "Orbit", "Pixel", "Glitch", "Zephyr", "Koda",
+  "Rex", "Luna", "Atlas", "Kairo", "Jax", "Zara", "Milo", "Ivy",
+  "Ace", "Ryder", "Kai", "Sora", "Hana", "Ren", "Yuki", "Haruto",
+  "Mina", "Eli", "Zoe", "Leo", "Maya", "Owen", "Iris", "Leo",
+  "Finn", "Aria", "Liam", "Ella", "Noah", "Ava", "Lucas", "Mia",
+  "Ethan", "Sofia", "James", "Amelia", "Oliver", "Charlotte",
+  "William", "Isabella", "Henry", "Ava", "Theodore", "Luna",
+  "Jack", "Scarlett", "Charlie", "Ruby", "Harry", "Grace",
+  "George", "Olive", "Freddie", "Rosie", "Albie", "Ivy",
+  "Teddy", "Poppy", "Arthur", "Daisy", "Muhammad", "Amelia",
+  "Noah", "Olivia", "Leo", "Ava", "Oscar", "Mia", "Arthur",
+  "Isla", "Henry", "Sophia", "Freddie", "Grace", "Charlie",
+  "Lily", "Albie", "Grace", "Theo", "Emilia", "Archie",
+  "Sienna", "Henry", "Elsie", "Jack", "Maya", "Leo", "Aria"
+];
+
+function getRandomName() {
+  return RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + '_' + Math.floor(Math.random() * 9999);
+}
 
 function getRandomReply() {
   return AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
@@ -102,8 +126,8 @@ function createBot(name, host, port, config = {}) {
     }
 
     entry._botInstance = bot;
-    addConsoleLog(entry, 'system', 'Bot instance created, connecting to ' + host + ':' + port);
-    console.log('[bot:' + name + '] Bot instance created');
+    addConsoleLog(entry, 'system', 'Connecting to ' + host + ':' + port + ' as ' + name);
+    console.log('[bot:' + name + '] Connecting...');
     wireEvents(entry, bot);
   }
 
@@ -133,12 +157,11 @@ function createBot(name, host, port, config = {}) {
           if (botInstance && botInstance.isChatAvailable() && status.loggedIn) {
             botInstance.chat(merged.autoChatOnJoin);
             addConsoleLog(entry, 'command', merged.autoChatOnJoin);
-            console.log('[bot:' + name + '] Auto-chat on join: ' + merged.autoChatOnJoin);
           }
         }, 3000);
       }
 
-      // Auto register / login
+      // Auto register/login
       if (merged.autoLogin && merged.botPassword) {
         setTimeout(function () {
           if (botInstance && botInstance.isChatAvailable()) {
@@ -146,7 +169,7 @@ function createBot(name, host, port, config = {}) {
               botInstance.chat('/register ' + merged.botPassword + ' ' + merged.botPassword);
               entry.hasRegistered = true;
               addConsoleLog(entry, 'command', '/register **** ****');
-              console.log('[bot:' + name + '] Sent /register (first time)');
+              console.log('[bot:' + name + '] Sent /register');
             } else {
               botInstance.chat('/login ' + merged.botPassword);
               addConsoleLog(entry, 'command', '/login ****');
@@ -191,7 +214,6 @@ function createBot(name, host, port, config = {}) {
             const reply = getRandomReply();
             botInstance.chat(reply);
             addConsoleLog(entry, 'command', reply);
-            console.log('[bot:' + name + '] Auto-replied: ' + reply);
           }
         }, 1000 + Math.random() * 3000);
       }
@@ -299,7 +321,6 @@ function createBot(name, host, port, config = {}) {
       if (botRef && botRef.isChatAvailable() && status.loggedIn) {
         botRef.chat(merged.spamMessage);
         addConsoleLog(entry, 'command', merged.spamMessage);
-        console.log('[bot:' + name + '] Spam: ' + merged.spamMessage);
       }
     }, merged.spamIntervalMs);
   }
@@ -383,7 +404,8 @@ function setMode(name, mode) {
 
 function botChat(name, message) {
   const entry = bots.get(name);
-  if (!entry || !entry.status.connected) {
+  if (!entry) throw new Error('Bot not found: ' + name);
+  if (!entry.status.connected) {
     throw new Error('Bot not connected: ' + name);
   }
   const botRef = entry._botInstance;
@@ -429,5 +451,6 @@ module.exports = {
   botChat: botChat,
   setAutoChat: setAutoChat,
   setSpam: setSpam,
+  getRandomName: getRandomName,
   DEFAULT_CONFIG: DEFAULT_CONFIG
 };

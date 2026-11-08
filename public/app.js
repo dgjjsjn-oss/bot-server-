@@ -2,99 +2,83 @@ const BASE = '';
 let selectedMode = 'idle';
 let serverHost = '';
 let serverPort = '';
-let botCards = {}; // name -> card DOM element
+let botCards = {};
+
+const RANDOM_NAMES = [
+  "wembo","Player1","Noob","ProGamer","XxSlayer","Bot99","Creeper","Steve","Alex",
+  "Herobrine","Notch","Ghost","Ninja","Shadow","Viper","Blaze","Frost","Ember",
+  "Storm","Zenith","Nova","Orbit","Pixel","Glitch","Zephyr","Koda","Rex","Luna",
+  "Atlas","Kairo","Jax","Zara","Milo","Ivy","Ace","Ryder","Kai","Sora","Hana",
+  "Ren","Yuki","Haruto","Mina","Eli","Zoe","Leo","Maya","Owen","Iris","Haruto",
+  "Finn","Aria","Liam","Ella","Noah","Ava","Lucas","Mia","Ethan","Sofia","James",
+  "Amelia","Oliver","Charlotte","William","Isabella","Henry","Theodore","Luna",
+  "Jack","Scarlett","Charlie","Ruby","Harry","Grace","George","Olive","Freddie",
+  "Rosie","Albie","Ivy","Teddy","Poppy","Arthur","Daisy","Muhammad","Amelia",
+  "Noah","Olivia","Leo","Ava","Oscar","Mia","Arthur","Isla","Henry","Sophia",
+  "Freddie","Grace","Charlie","Lily","Albie","Grace","Theo","Emilia","Archie",
+  "Sienna","Henry","Elsie","Jack","Maya","Leo","Aria"
+];
+
+function getRandomName() {
+  return RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + '_' + Math.floor(Math.random() * 9999);
+}
 
 function setupModePills() {
-  document.querySelectorAll('.mode-pill').forEach(function (pill) {
-    pill.addEventListener('click', function () {
-      document.querySelectorAll('.mode-pill').forEach(function (p) {
-        p.classList.remove('active');
-      });
-      pill.classList.add('active');
-      selectedMode = pill.getAttribute('data-mode');
+  document.querySelectorAll('.mode-pill').forEach(p => {
+    p.addEventListener('click', function() {
+      document.querySelectorAll('.mode-pill').forEach(x => x.classList.remove('active'));
+      this.classList.add('active');
+      selectedMode = this.getAttribute('data-mode');
       document.getElementById('summonMode').value = selectedMode;
     });
   });
 }
 
-function consoleClass(type) {
-  switch (type) {
-    case 'error': return 'error';
-    case 'command': return 'command';
-    case 'chat': return 'chat';
-    case 'system': return 'system';
-    default: return 'info';
-  }
+function consoleClass(t) {
+  return {error:'error', command:'command', chat:'chat', system:'system'}[t] || 'info';
 }
-
 function formatTime(iso) {
   if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleTimeString();
-  } catch (e) {
-    return iso;
-  }
+  return new Date(iso).toLocaleTimeString();
 }
 
 async function loadConfig() {
   try {
-    const res = await fetch(BASE + '/api/config');
-    const cfg = await res.json();
-    serverHost = cfg.host || '';
-    serverPort = cfg.port || '';
-    const hostEl = document.getElementById('dashHost');
-    const portEl = document.getElementById('dashPort');
-    if (hostEl) hostEl.textContent = serverHost || 'Not configured';
-    if (portEl) portEl.textContent = serverPort || 'Not configured';
-  } catch (e) {
-    console.error('Failed to load config:', e);
-  }
+    const r = await fetch(BASE + '/api/config');
+    const c = await r.json();
+    serverHost = c.host || ''; serverPort = c.port || '';
+    const h = document.getElementById('dashHost'); const p = document.getElementById('dashPort');
+    if (h) h.textContent = serverHost || 'Not configured';
+    if (p) p.textContent = serverPort || 'Not configured';
+  } catch(e) { console.error('config load failed', e); }
 }
 
-function escapeHtml(text) {
-  if (!text) return '';
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function escapeJs(text) {
-  return String(text).replace(/'/g, "\\'").replace(/\\/g, '\\\\');
-}
+function escapeHtml(t){if(!t)return'';return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escapeJs(t){return String(t).replace(/'/g,"\\'").replace(/\\/g,'\\\\');}
 
 function createBotCardHTML(b) {
-  const dotClass = b.connected ? 'live' : 'dead';
-  const statusText = b.connected ? 'online' : 'offline';
-  const loginText = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
-  const pos = b.position ? ' • ' + Math.round(b.position.x) + ',' + Math.round(b.position.y) + ',' + Math.round(b.position.z) : '';
-
-  let logsHtml = '';
-  if (b.consoleLogs && b.consoleLogs.length > 0) {
-    logsHtml = b.consoleLogs.slice(-10).map(function (log) {
-      return '<div class="console-line ' + consoleClass(log.type) + '">' +
-        '<span class="console-time">[' + formatTime(log.time) + ']</span>' +
-        escapeHtml(log.message) +
-        '</div>';
-    }).join('');
+  const live = b.connected;
+  const dotClass = live ? 'live' : 'dead';
+  const statusText = live ? 'online' : 'offline';
+  const login = b.loggedIn ? ' • logged in' : live ? ' • not logged in' : '';
+  const pos = b.position ? ' • ' + Math.round(b.position.x)+','+Math.round(b.position.y)+','+Math.round(b.position.z) : '';
+  let logs = '';
+  if (b.consoleLogs && b.consoleLogs.length) {
+    logs = b.consoleLogs.slice(-10).map(l =>
+      '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
+    ).join('');
   }
-
   return `
-    <div class="bot-card ${b.connected ? 'connected' : ''}" id="bot-card-${escapeJs(b.name)}">
+    <div class="bot-card ${live?'connected':''}" id="bot-card-${escapeJs(b.name)}">
       <div class="bot-header">
-        <div>
-          <div class="bot-name">${escapeHtml(b.name)}</div>
-          <div class="bot-meta">${escapeHtml(b.host)}:${b.port} ${pos}</div>
-        </div>
-        <div class="bot-status ${b.connected ? 'connected' : ''}">
-          <div class="dot ${dotClass}"></div>
-          ${statusText}${loginText}
-        </div>
+        <div><div class="bot-name">${escapeHtml(b.name)}</div><div class="bot-meta">${escapeHtml(b.host)}:${b.port}${pos}</div></div>
+        <div class="bot-status ${live?'connected':''}"><div class="dot ${dotClass}"></div>${statusText}${login}</div>
       </div>
-
       <div class="controls-row">
-        <button class="btn btn-sm btn-secondary" onclick="setModeBot('${escapeJs(b.name)}', 'idle')">Idle</button>
-        <button class="btn btn-sm btn-secondary" onclick="setModeBot('${escapeJs(b.name)}', 'wander')">Wander</button>
+        <button class="btn btn-sm btn-secondary" onclick="setModeBot('${escapeJs(b.name)}','idle')">Idle</button>
+        <button class="btn btn-sm btn-secondary" onclick="setModeBot('${escapeJs(b.name)}','wander')">Wander</button>
         <button class="btn btn-sm btn-danger" onclick="kickBot('${escapeJs(b.name)}')">Kick</button>
       </div>
-
       <div class="feature-section">
         <h3>Send Command / Chat</h3>
         <div class="input-row">
@@ -102,105 +86,70 @@ function createBotCardHTML(b) {
           <button class="btn btn-sm btn-primary" onclick="sendChat('${escapeJs(b.name)}')">Send</button>
         </div>
       </div>
-
       <div class="feature-section">
         <h3>Auto-Chat on Join</h3>
         <div class="input-row">
-          <input type="text" id="autoChatInput-${escapeJs(b.name)}" placeholder="Message to send on spawn...">
+          <input type="text" id="autoChatInput-${escapeJs(b.name)}" placeholder="Message on spawn...">
           <button class="btn btn-sm btn-primary" onclick="setAutoChat('${escapeJs(b.name)}')">Set</button>
         </div>
       </div>
-
       <div class="feature-section">
         <h3>Spam / Repeat</h3>
         <div class="input-row">
-          <input type="text" id="spamInput-${escapeJs(b.name)}" placeholder="Message to repeat...">
+          <input type="text" id="spamInput-${escapeJs(b.name)}" placeholder="Message...">
           <input type="number" id="spamInterval-${escapeJs(b.name)}" placeholder="ms" value="30000" style="width:80px;">
           <button class="btn btn-sm btn-warning" onclick="setSpam('${escapeJs(b.name)}')">Set Spam</button>
         </div>
       </div>
-
       <div class="feature-section">
         <h3>Live Console</h3>
-        <div class="console-box" id="console-${escapeJs(b.name)}">${logsHtml || '<div class="console-line system">No logs yet...</div>'}</div>
+        <div class="console-box" id="console-${escapeJs(b.name)}">${logs||'<div class="console-line system">No logs yet...</div>'}</div>
       </div>
     </div>
   `;
 }
 
 async function loadBots() {
-  const res = await fetch(BASE + '/api/bots');
-  const bots = await res.json();
+  const r = await fetch(BASE + '/api/bots');
+  const bots = await r.json();
   const list = document.getElementById('botList');
-  const currentNames = new Set();
-
+  const current = new Set();
   if (bots.length === 0) {
-    if (list.children.length === 0 || (list.children[0] && list.children[0].classList.contains('empty-state'))) {
-      list.innerHTML = `
-        <div class="empty-state">
-          <div class="icon">🤖</div>
-          <p>No bots yet. Summon your first bot above.</p>
-        </div>
-      `;
+    if (!list.children[0] || !list.children[0].classList.contains('empty-state')) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">🤖</div><p>No bots yet. Summon your first bot.</p></div>';
     }
-    botCards = {};
-    return;
+    botCards = {}; return;
   }
-
-  if (list.children[0] && list.children[0].classList.contains('empty-state')) {
-    list.innerHTML = '';
-  }
-
+  if (list.children[0] && list.children[0].classList.contains('empty-state')) list.innerHTML = '';
   for (const b of bots) {
-    currentNames.add(b.name);
-    const cardId = 'bot-card-' + escapeJs(b.name);
-
+    current.add(b.name);
+    const cid = 'bot-card-'+escapeJs(b.name);
     if (!botCards[b.name]) {
-      const div = document.createElement('div');
-      div.innerHTML = createBotCardHTML(b);
-      const card = div.firstElementChild;
-      list.appendChild(card);
-      botCards[b.name] = card;
+      const d = document.createElement('div'); d.innerHTML = createBotCardHTML(b);
+      list.appendChild(d.firstElementChild);
+      botCards[b.name] = document.getElementById(cid);
     } else {
-      const card = botCards[b.name];
-      const nameEl = card.querySelector('.bot-name');
-      const metaEl = card.querySelector('.bot-meta');
-      const statusEl = card.querySelector('.bot-status');
-      const dotEl = statusEl ? statusEl.querySelector('.dot') : null;
-      const pos = b.position ? ' • ' + Math.round(b.position.x) + ',' + Math.round(b.position.y) + ',' + Math.round(b.position.z) : '';
-
-      if (nameEl) nameEl.textContent = escapeHtml(b.name);
-      if (metaEl) metaEl.textContent = b.host + ':' + b.port + pos;
-
-      const loginText = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
-      if (statusEl) {
-        statusEl.className = 'bot-status ' + (b.connected ? 'connected' : '');
-        statusEl.innerHTML = '<div class="dot ' + (b.connected ? 'live' : 'dead') + '"></div>' +
-          (b.connected ? 'online' : 'offline') + loginText;
+      const c = botCards[b.name];
+      const pos = b.position ? ' • '+Math.round(b.position.x)+','+Math.round(b.position.y)+','+Math.round(b.position.z) : '';
+      const ne = c.querySelector('.bot-name'); const me = c.querySelector('.bot-meta');
+      const se = c.querySelector('.bot-status');
+      if (ne) ne.textContent = escapeHtml(b.name);
+      if (me) me.textContent = b.host+':'+b.port+pos;
+      const login = b.loggedIn ? ' • logged in' : b.connected ? ' • not logged in' : '';
+      if (se) {
+        se.className = 'bot-status '+(b.connected?'connected':'');
+        se.innerHTML = '<div class="dot '+(b.connected?'live':'dead')+'"></div>'+(b.connected?'online':'offline')+login;
       }
-
-      const consoleBox = card.querySelector('#console-' + escapeJs(b.name));
-      if (consoleBox && b.consoleLogs && b.consoleLogs.length > 0) {
-        const newLogs = b.consoleLogs.slice(-10).map(function (log) {
-          return '<div class="console-line ' + consoleClass(log.type) + '">' +
-            '<span class="console-time">[' + formatTime(log.time) + ']</span>' +
-            escapeHtml(log.message) +
-            '</div>';
-        }).join('');
-        if (consoleBox.innerHTML !== newLogs) {
-          consoleBox.innerHTML = newLogs;
-          consoleBox.scrollTop = consoleBox.scrollHeight;
-        }
+      const cb = c.querySelector('#console-'+escapeJs(b.name));
+      if (cb && b.consoleLogs && b.consoleLogs.length) {
+        const nl = b.consoleLogs.slice(-10).map(l =>
+          '<div class="console-line '+consoleClass(l.type)+'"><span class="console-time">['+formatTime(l.time)+']</span>'+escapeHtml(l.message)+'</div>'
+        ).join('');
+        if (cb.innerHTML !== nl) { cb.innerHTML = nl; cb.scrollTop = cb.scrollHeight; }
       }
     }
   }
-
-  for (const name of Object.keys(botCards)) {
-    if (!currentNames.has(name)) {
-      botCards[name].remove();
-      delete botCards[name];
-    }
-  }
+  for (const n of Object.keys(botCards)) if (!current.has(n)) { botCards[n].remove(); delete botCards[n]; }
 }
 
 async function summonBot() {
@@ -208,166 +157,70 @@ async function summonBot() {
   const pass = document.getElementById('summonPass').value.trim();
   const mode = document.getElementById('summonMode').value;
   const btn = document.getElementById('summonBtn');
-  btn.disabled = true;
-  btn.textContent = 'Summoning...';
+  btn.disabled = true; btn.textContent = 'Summoning...';
   try {
-    const res = await fetch(BASE + '/api/bots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: name,
-        host: serverHost || undefined,
-        port: serverPort || undefined,
-        mode: mode,
-        botPassword: pass || null,
-        autoLogin: pass ? true : false
-      })
+    const r = await fetch(BASE + '/api/bots', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, host:serverHost||undefined, port:serverPort||undefined, mode, botPassword:pass||null, autoLogin:pass?true:false})
     });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Failed to summon bot');
-      return;
-    }
-    document.getElementById('summonName').value = '';
-    document.getElementById('summonPass').value = '';
+    if (!r.ok) { const e = await r.json(); alert(e.error||'Failed'); return; }
+    document.getElementById('summonName').value=''; document.getElementById('summonPass').value='';
     loadBots();
-  } catch (e) {
-    alert('Request failed: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Summon Bot';
-  }
+  } catch(e) { alert('Failed: '+e.message); } finally { btn.disabled=false; btn.textContent='Summon Bot'; }
 }
 
-async function setModeBot(name, mode) {
-  const res = await fetch(BASE + '/api/bots/' + encodeURIComponent(name) + '/mode', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode: mode })
-  });
-  if (res.ok) loadBots();
-  else alert('Failed to change mode');
+async function setModeBot(n, m) {
+  const r = await fetch(BASE + '/api/bots/'+encodeURIComponent(n)+'/mode', {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})});
+  if (r.ok) loadBots(); else alert('Failed');
 }
-
-async function kickBot(name) {
-  if (!confirm('Remove bot ' + name + '?')) return;
-  const res = await fetch(BASE + '/api/bots/' + encodeURIComponent(name), {
-    method: 'DELETE'
-  });
-  if (res.ok) loadBots();
-  else alert('Failed to kick bot');
+async function kickBot(n) {
+  if(!confirm('Remove '+n+'?')) return;
+  const r = await fetch(BASE + '/api/bots/'+encodeURIComponent(n), {method:'DELETE'});
+  if (r.ok) loadBots(); else alert('Failed');
 }
-
-async function sendChat(name) {
-  const input = document.getElementById('chatInput-' + escapeJs(name));
-  const message = input.value.trim();
-  if (!message) return;
-  input.disabled = true;
+async function sendChat(n) {
+  const i = document.getElementById('chatInput-'+escapeJs(n)); const m = i.value.trim();
+  if(!m) return; i.disabled=true;
   try {
-    const res = await fetch(BASE + '/api/bots/' + encodeURIComponent(name) + '/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: message })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Failed to send');
-      return;
-    }
-    input.value = '';
-  } catch (e) {
-    alert('Request failed: ' + e.message);
-  } finally {
-    input.disabled = false;
-  }
+    const r = await fetch(BASE + '/api/bots/'+encodeURIComponent(n)+'/chat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
+    if(!r.ok){const e=await r.json(); alert(e.error||'Failed'); return;}
+    i.value='';
+  }catch(e){alert('Failed: '+e.message);} finally{i.disabled=false;}
 }
-
-async function setAutoChat(name) {
-  const input = document.getElementById('autoChatInput-' + escapeJs(name));
-  const message = input.value.trim();
-  if (!message) return;
-  input.disabled = true;
+async function setAutoChat(n) {
+  const i = document.getElementById('autoChatInput-'+escapeJs(n)); const m=i.value.trim();
+  if(!m) return; i.disabled=true;
   try {
-    const res = await fetch(BASE + '/api/bots/' + encodeURIComponent(name) + '/autochat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: message })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Failed to set auto-chat');
-      return;
-    }
-    input.value = '';
-    loadBots();
-  } catch (e) {
-    alert('Request failed: ' + e.message);
-  } finally {
-    input.disabled = false;
-  }
+    const r = await fetch(BASE + '/api/bots/'+encodeURIComponent(n)+'/autochat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
+    if(!r.ok){const e=await r.json(); alert(e.error||'Failed'); return;}
+    i.value=''; loadBots();
+  }catch(e){alert('Failed: '+e.message);} finally{i.disabled=false;}
 }
-
-async function setSpam(name) {
-  const input = document.getElementById('spamInput-' + escapeJs(name));
-  const intervalInput = document.getElementById('spamInterval-' + escapeJs(name));
-  const message = input.value.trim();
-  const intervalMs = parseInt(intervalInput.value) || 30000;
-  if (!message) return;
-  input.disabled = true;
-  intervalInput.disabled = true;
+async function setSpam(n) {
+  const i = document.getElementById('spamInput-'+escapeJs(n)); const iv = document.getElementById('spamInterval-'+escapeJs(n));
+  const m=i.value.trim(); const ms=parseInt(iv.value)||30000;
+  if(!m) return; i.disabled=true; iv.disabled=true;
   try {
-    const res = await fetch(BASE + '/api/bots/' + encodeURIComponent(name) + '/spam', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: message, intervalMs: intervalMs })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Failed to set spam');
-      return;
-    }
-    input.value = '';
-    loadBots();
-  } catch (e) {
-    alert('Request failed: ' + e.message);
-  } finally {
-    input.disabled = false;
-    intervalInput.disabled = false;
-  }
+    const r = await fetch(BASE + '/api/bots/'+encodeURIComponent(n)+'/spam', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m, intervalMs:ms})});
+    if(!r.ok){const e=await r.json(); alert(e.error||'Failed'); return;}
+    i.value=''; loadBots();
+  }catch(e){alert('Failed: '+e.message);} finally{i.disabled=false; iv.disabled=false;}
 }
-
 async function bulkSummon() {
   const count = document.getElementById('bulkCount').value.trim();
-  const prefix = document.getElementById('bulkPrefix').value.trim() || 'TestBot';
+  const prefix = document.getElementById('bulkPrefix').value.trim()||'Bot';
   const pass = document.getElementById('bulkPass').value.trim();
+  const rn = document.getElementById('bulkRandom').checked;
+  const mode = window.bulkMode || selectedMode || 'wander';
   const btn = document.querySelector('button[onclick="bulkSummon()"]');
-  btn.disabled = true;
-  btn.textContent = 'Summoning...';
+  btn.disabled=true; btn.textContent='Summoning...';
   try {
-    const res = await fetch(BASE + '/api/bots/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        count: count,
-        prefix: prefix,
-        botPassword: pass || null,
-        autoLogin: pass ? true : false
-      })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Bulk summon failed');
-      return;
-    }
-    const data = await res.json();
-    alert('Summoned ' + data.summoned + ' bots' + (data.errors.length > 0 ? ' (' + data.errors.length + ' failed)' : ''));
+    const r = await fetch(BASE + '/api/bots/bulk', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count, prefix, mode, botPassword:pass||null, autoLogin:pass?true:false, randomNames:rn})});
+    if(!r.ok){const e=await r.json(); alert(e.error||'Bulk failed'); return;}
+    const d=await r.json();
+    alert('Summoned '+d.summoned+'/'+d.requested+' bots'+(d.errors.length?' ('+d.errors.length+' failed)':''));
     loadBots();
-  } catch (e) {
-    alert('Request failed: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Bulk Summon Bots';
-  }
+  }catch(e){alert('Failed: '+e.message);} finally{btn.disabled=false; btn.textContent='Bulk Summon Bots';}
 }
 
 document.getElementById('summonBtn').addEventListener('click', summonBot);
