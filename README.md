@@ -1,76 +1,61 @@
-# Minecraft Bot Control Panel
+# Minecraft Keepalive — Website Pings Your Server
 
-Summon fake-player bots (NPCs/workers) to your Minecraft server with no Microsoft/Mojang account, then control them from a website.
-
-Each bot joins your server like a real player (e.g. name it "wembo"), sends keepalive chat so free hosts do not idle-shutdown the server, and can be summoned, kicked, or made to chat from the web panel.
+Render website keeps itself awake via Uptime Robot, and optionally pings your
+Minecraft server port so the host sees activity. No bot accounts, no fake
+players, no backdoors, negligible CPU/RAM.
 
 ## How it works
 
-1. Deploy `server.js` to Render (free web service).
-2. Open the web control panel at your Render URL.
-3. Summon bots by name + server host + port. They join via Mineflayer (offline/cracked mode only).
-4. Use Uptime Robot / cron-job.org to ping `/ping` every 5–10 minutes so Render never sleeps and the bots stay connected.
-
-## Requirements
-
-- Your Minecraft server must be in **offline mode** (`online-mode=false` in `server.properties`). Account-less bots cannot join authenticated servers.
-- Node.js 18+.
-
-## Local setup
-
-```bash
-cd minecraft-keepalive-bot
-
-copy .env.example .env     # Windows
-# or
-cp .env.example .env       # Linux/Mac
-
-# Edit .env: set MC_HOST and MC_PORT to your server
-
-npm install
-npm start
 ```
-
-Open `http://localhost:3000` for the control panel.
+Uptime Robot → pings https://your-app.onrender.com/ping every 5 min
+                              ↓
+                    Render stays awake
+                              ↓
+          Render sends Minecraft status ping to your server port
+                              ↓
+                    Your host sees activity, stays awake
+```
 
 ## Deploy to Render
 
-1. Push this folder to GitHub.
-2. Render → Create **Web Service** → connect repo.
-3. Build command: `npm install`
-4. Start command: `npm start`
-5. Add env vars: `MC_HOST`, `MC_PORT`, optional `BOT_NAME`.
-6. Deploy. Public URL like `https://mc-bots.onrender.com`.
+1. Connect GitHub repo `dgjjsjn-oss/bot-server-`
+2. Build command: `npm install`
+3. Start command: `npm start`
+4. Add env vars:
+   - `MC_HOST=dogpvp.falix.gg`
+   - `MC_PORT=29349`
+   - `BOT_NAME=wembo` (optional)
+   - `AUTO_PING_SERVER=true`
+   - `PING_INTERVAL_MS=180000`
+5. Deploy. Copy your Render URL.
 
 ## Keep Render awake
 
-Set an uptime monitor to `https://your-app.onrender.com/ping` every 5 minutes (Uptime Robot, cron-job.org, etc.).
+Set Uptime Robot to ping `https://your-app.onrender.com/ping` every 5 minutes.
 
-## Web API
+## Test from website
 
-| Endpoint | Method | Body | Description |
-|----------|--------|------|-------------|
-| `/api/bots` | GET | — | List all bots with status |
-| `/api/bots` | POST | `{name, host, port}` | Summon a new bot |
-| `/api/bots/:name` | GET | — | Get one bot's status |
-| `/api/bots/:name` | DELETE | — | Kick / remove a bot |
-| `/api/bots/:name/chat` | POST | `{message}` | Make the bot send chat |
-| `/ping` | GET | — | Health / keepalive endpoint |
-| `/status` | GET | — | Summary stats |
+Open your Render URL in a browser. You can manually trigger a ping to your
+Minecraft server via the API or check `/api/ping-server` to see the last result.
+
+## Important limits
+
+- This sends a **Minecraft status ping** (the same packet your server browser
+  sends when you hover a server in multiplayer). It is lightweight and safe.
+- Some free hosts (Falix, Aternos, Minehut) only count **real player
+  connections** as activity, not query pings. If your host still sleeps the
+  server, the only reliable fix is a real bot connection (requires
+  `online-mode=false`) or upgrading your host plan.
+- This plugin/website opens no backdoor, listens on no extra ports, and runs
+  zero commands on your server.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `server.js` | Express web server + REST API |
-| `bots.js` | Multi-bot Mineflayer manager (summon, kick, chat, auto-reconnect) |
+| `server.js` | Express web server + auto pinger |
+| `keepalive-pinger.js` | Pure Node Minecraft status ping client |
 | `public/index.html` | Control panel UI |
 | `public/app.js` | Frontend API calls |
 | `.env.example` | Copy to `.env` and fill in your server details |
 | `package.json` | Dependencies and start script |
-
-## Important notes
-
-- Bots use no authentication. Only works on offline-mode (cracked) servers.
-- If your server is `online-mode=true`, you need a premium Minecraft account and Mojang auth — this bot does not handle that.
-- This is for servers you own or administer. Do not use it to bypass limits on hosts you do not control.

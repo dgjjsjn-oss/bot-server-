@@ -2,9 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const {
-  createBot, listBots, getBot, removeBot, setMode, botChat, DEFAULT_CONFIG
-} = require('./bots');
+const { createBot, listBots, getBot, removeBot, setMode, botChat, DEFAULT_CONFIG } = require('./bots');
+const { pingServer } = require('./keepalive-pinger');
 
 const app = express();
 const PORT = parseInt(process.env.PORT) || 3000;
@@ -13,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Optional default bot from env
+// Optional default bot from env (only needed if you want a real bot in tab list)
 const defaultHost = process.env.MC_HOST;
 const defaultPort = parseInt(process.env.MC_PORT) || 25565;
 const defaultName = process.env.BOT_NAME || 'KeepAliveBot';
@@ -24,6 +23,31 @@ if (defaultHost) {
   } catch (e) {
     console.error('[web] Could not create default bot:', e.message);
   }
+}
+
+// Auto ping your Minecraft server from Render so the host sees activity.
+// Disabled by default; enable with AUTO_PING_SERVER=true
+const AUTO_PING = process.env.AUTO_PING_SERVER === 'true';
+const PING_INTERVAL_MS = parseInt(process.env.PING_INTERVAL_MS) || 180000; // 3 minutes
+
+let lastPing = { ok: null, time: null, error: null };
+
+async function doPing() {
+  if (!defaultHost) return;
+  try {
+    const result = await pingServer(defaultHost, defaultPort);
+    lastPing = { ok: true, time: new Date().toISOString(), error: null, raw: result.raw };
+    console.log('[ping] Minecraft server responded OK');
+  } catch (e) {
+    lastPing = { ok: false, time: new Date().toISOString(), error: e.message };
+    console.error('[ping] Minecraft server ping failed:', e.message);
+  }
+}
+
+if (AUTO_PING && defaultHost) {
+  setInterval(doPing, PING_INTERVAL_MS);
+  doPing();
+  console.log('[web] Auto-ping enabled for ' + defaultHost + ':' + defaultPort);
 }
 
 // List all bots
@@ -86,13 +110,24 @@ app.post('/api/bots/:name/chat', function (req, res) {
   }
 });
 
+// Manual trigger to ping your Minecraft server from Render
+app.post('/api/ping-server', async function (req, res) {
+  await doPing();
+  res.json(lastPing);
+});
+
+// Get last ping result
+app.get('/api/ping-server', function (req, res) {
+  res.json(lastPing);
+});
+
 // Health
 app.get('/ping', function (req, res) {
   res.send('pong');
 });
 
 app.get('/status', function (req, res) {
-  res.json({ bots: listBots().length, uptime: process.uptime(), config: DEFAULT_CONFIG });
+  res.json({ bots: listBots().length, uptime: process.uptime(), config: DEFAULT_CONFIG, lastPing });
 });
 
 app.get('/', function (req, res) {
