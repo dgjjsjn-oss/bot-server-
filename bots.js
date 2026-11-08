@@ -1,4 +1,5 @@
 const mineflayer = require('mineflayer');
+const { vec3 } = require('vec3');
 
 const bots = new Map();
 
@@ -12,17 +13,18 @@ const DEFAULT_CONFIG = {
   maxBots: 99,
   autoLogin: true,
   botPassword: null,
-  loginDelayMs: 6000,
-  reconnectDelayMs: 8000,
-  version: false,  // Don't force version - let Mineflayer auto-detect
+  loginDelayMs: 8000,      // Wait 8 seconds after spawn before logging in
+  reconnectDelayMs: 15000, // Wait 15 seconds before reconnecting
+  version: false,          // Auto-detect server version
   autoReply: true,
   replyChance: 0.5,
   maxConsoleLogs: 80,
   autoChatOnJoin: null,
   spamMessage: null,
   spamIntervalMs: 30000,
-  staggerDelayMs: 300,
-  randomBehavior: true
+  staggerDelayMs: 500,     // 500ms between each bot connection
+  randomBehavior: true,
+  connectTimeoutMs: 15000  // 15 second connection timeout
 };
 
 const RANDOM_NAMES = [
@@ -42,6 +44,10 @@ const RANDOM_NAMES = [
 
 function getRandomName() {
   return RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + '_' + Math.floor(Math.random() * 9999);
+}
+
+function getRandomDelay(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 const SMART_REPLIES = [
@@ -101,7 +107,7 @@ function createBot(name, host, port, config = {}) {
 
   let bot = null, keepaliveInterval=null, wanderInterval=null, jumpInterval=null;
   let lookInterval=null, spamInterval=null, reconnectTimeout=null;
-  const entry = { status, config: merged, _botInstance: bot, consoleLogs: [], hasRegistered: false };
+  const entry = { status, config: merged, _botInstance: bot, consoleLogs: [], hasRegistered: false, loginAttempted: false };
 
   function createInstance() {
     try {
@@ -109,7 +115,7 @@ function createBot(name, host, port, config = {}) {
         host: host,
         port: port,
         username: name,
-        version: false  // Critical: don't force version, let Mineflayer auto-detect
+        version: false
       });
     } catch(e) {
       status.error = e.message;
@@ -137,23 +143,32 @@ function createBot(name, host, port, config = {}) {
       startKeepalive(entry); startWander(entry); startJump(entry); startLook(entry); startSpam(entry);
 
       if (merged.autoChatOnJoin) {
-        setTimeout(() => { if(botInstance&&botInstance.isChatAvailable()&&status.loggedIn){ botInstance.chat(merged.autoChatOnJoin); addConsoleLog(entry,'command',merged.autoChatOnJoin); }}, 3000);
+        setTimeout(() => { if(botInstance&&botInstance.isChatAvailable()&&status.loggedIn){ botInstance.chat(merged.autoChatOnJoin); addConsoleLog(entry,'command',merged.autoChatOnJoin); }}, 5000);
       }
 
       if (merged.autoLogin && merged.botPassword) {
+        // Wait a random delay before logging in to avoid spamming
+        const loginDelay = merged.loginDelayMs + getRandomDelay(0, 3000);
         setTimeout(() => {
-          if(botInstance&&botInstance.isChatAvailable()) {
-            if(!entry.hasRegistered){ botInstance.chat('/register '+merged.botPassword+' '+merged.botPassword); entry.hasRegistered=true; addConsoleLog(entry,'command','/register **** ****'); }
-            else { botInstance.chat('/login '+merged.botPassword); addConsoleLog(entry,'command','/login ****'); }
+          if(botInstance&&botInstance.isChatAvailable()&&!entry.loginAttempted) {
+            entry.loginAttempted = true;
+            if(!entry.hasRegistered){ 
+              botInstance.chat('/register '+merged.botPassword+' '+merged.botPassword); 
+              entry.hasRegistered=true; 
+              addConsoleLog(entry,'command','/register **** ****'); 
+            } else { 
+              botInstance.chat('/login '+merged.botPassword); 
+              addConsoleLog(entry,'command','/login ****'); 
+            }
             status.loggedIn = true;
           }
-        }, merged.loginDelayMs);
+        }, loginDelay);
       }
       addConsoleLog(entry, 'info', 'Spawned in world');
     });
 
     botInstance.on('end', () => {
-      status.connected=false; status.loggedIn=false;
+      status.connected=false; status.loggedIn=false; entry.loginAttempted = false;
       stopKeepalive(entry); stopWander(entry); stopJump(entry); stopLook(entry); stopSpam(entry);
       addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
       console.log('[bot:' + name + '] Disconnected');
@@ -172,7 +187,8 @@ function createBot(name, host, port, config = {}) {
         if(lower.includes('register') || lower.includes('login') || lower.includes('password') || lower.includes('please register') || lower.includes('please login')) {
           addConsoleLog(entry, 'system', 'Detected login prompt from server');
           setTimeout(() => {
-            if(botInstance&&botInstance.isChatAvailable()) {
+            if(botInstance&&botInstance.isChatAvailable()&&!entry.loginAttempted) {
+              entry.loginAttempted = true;
               botInstance.chat('/register '+merged.botPassword+' '+merged.botPassword);
               entry.hasRegistered = true;
               addConsoleLog(entry, 'command', '/register **** **** (auto-detected)');
@@ -188,7 +204,7 @@ function createBot(name, host, port, config = {}) {
         if(reply) {
           setTimeout(() => {
             if(botInstance&&botInstance.isChatAvailable()&&status.loggedIn){ botInstance.chat(reply); addConsoleLog(entry,'command',reply); }
-          }, 1500 + Math.random() * 3000);
+          }, 2000 + Math.random() * 4000);
         }
       }
     });
