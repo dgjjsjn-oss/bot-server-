@@ -62,7 +62,7 @@ app.post('/api/bots', function (req, res) {
   if (!h) return res.status(400).json({ error: 'no host configured' });
   try {
     const status = createBot(name, h, parseInt(p) || 25565, {
-      mode: mode || 'idle',
+      mode: mode || 'wander',
       maxBots: maxBots || DEFAULT_CONFIG.maxBots,
       botPassword: botPassword || null,
       autoLogin: autoLogin !== undefined ? autoLogin : true
@@ -72,6 +72,8 @@ app.post('/api/bots', function (req, res) {
     res.status(400).json({ error: e.message });
   }
 });
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 app.post('/api/bots/bulk', async function (req, res) {
   const { count, host, port, mode, botPassword, autoLogin, prefix, randomNames } = req.body;
@@ -101,9 +103,9 @@ app.post('/api/bots/bulk', async function (req, res) {
     } catch (e) {
       errors.push({ name: botName, error: e.message });
     }
-    // Stagger connections by 1 second so server doesn't get overwhelmed
+    // Stagger each bot connection by 1 second so server doesn't get overwhelmed
     if (i < countNum - 1) {
-      await new Promise(r => setTimeout(r, 1000));
+      await sleep(1000);
     }
   }
 

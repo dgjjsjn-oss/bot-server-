@@ -4,25 +4,26 @@ const { vec3 } = require('vec3');
 const bots = new Map();
 
 const DEFAULT_CONFIG = {
-  mode: 'idle',
+  mode: 'wander',
   keepalive: true,
   keepaliveIntervalMs: 120000,
-  wanderIntervalMs: 15000,
-  jumpIntervalMs: 20000,
-  lookIntervalMs: 5000,
+  wanderIntervalMs: 10000,
+  jumpIntervalMs: 15000,
+  lookIntervalMs: 4000,
   maxBots: 99,
   autoLogin: true,
   botPassword: null,
-  loginDelayMs: 8000,
-  reconnectDelayMs: 15000,
+  loginDelayMs: 6000,
+  reconnectDelayMs: 10000,
   version: '1.21.11',
   autoReply: true,
-  replyChance: 0.6,
+  replyChance: 0.5,
   maxConsoleLogs: 100,
   autoChatOnJoin: null,
   spamMessage: null,
   spamIntervalMs: 30000,
-  staggerDelayMs: 1000
+  staggerDelayMs: 1000,
+  randomBehavior: true
 };
 
 const RANDOM_NAMES = [
@@ -44,7 +45,6 @@ function getRandomName() {
   return RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + '_' + Math.floor(Math.random() * 9999);
 }
 
-// Smarter AI responses - detects questions and context
 const SMART_REPLIES = [
   { match: /where/i, reply: ["im not sure", "around spawn", "check the map", "idk where"] },
   { match: /who/i, reply: ["just a player", "im a bot", "idk who", "a random player"] },
@@ -64,7 +64,8 @@ const SMART_REPLIES = [
 const AUTO_REPLIES = [
   "yo", "hi", "hello", "sup", "im just playing", "cool server", "nice",
   "lol", "haha", "im afk for a sec", "brb", "gg", "wp", "good game",
-  "lets go", "im here", "what?", "where?", "aaa", "omg"
+  "lets go", "im here", "what?", "where?", "aaa", "omg", "nice server",
+  "playing minecraft", "just joined", "wow", "epic"
 ];
 
 function smartReply(message) {
@@ -101,7 +102,7 @@ function createBot(name, host, port, config = {}) {
 
   let bot = null, keepaliveInterval=null, wanderInterval=null, jumpInterval=null;
   let lookInterval=null, spamInterval=null, reconnectTimeout=null;
-  const entry = { status, config: merged, _botInstance: bot, consoleLogs: [], hasRegistered: false, awaitingLogin: false };
+  const entry = { status, config: merged, _botInstance: bot, consoleLogs: [], hasRegistered: false };
 
   function createInstance() {
     try {
@@ -109,11 +110,13 @@ function createBot(name, host, port, config = {}) {
     } catch(e) {
       status.error = e.message;
       addConsoleLog(entry, 'error', 'Create failed: ' + e.message);
+      console.error('[bot:' + name + '] Create failed:', e.message);
       scheduleReconnect(entry);
       return;
     }
     entry._botInstance = bot;
     addConsoleLog(entry, 'system', 'Connecting to ' + host + ':' + port + ' as ' + name);
+    console.log('[bot:' + name + '] Connecting...');
     wireEvents(entry, bot);
   }
 
@@ -121,6 +124,7 @@ function createBot(name, host, port, config = {}) {
     botInstance.on('login', () => {
       status.connected = true; status.lastActivity = new Date().toISOString(); status.error = null;
       addConsoleLog(entry, 'info', 'Logged in to server');
+      console.log('[bot:' + name + '] Logged in');
     });
 
     botInstance.on('spawn', () => {
@@ -141,24 +145,24 @@ function createBot(name, host, port, config = {}) {
           }
         }, merged.loginDelayMs);
       }
-      addConsoleLog(entry, 'info', 'Spawned');
+      addConsoleLog(entry, 'info', 'Spawned in world');
     });
 
     botInstance.on('end', () => {
       status.connected=false; status.loggedIn=false;
       stopKeepalive(entry); stopWander(entry); stopJump(entry); stopLook(entry); stopSpam(entry);
       addConsoleLog(entry, 'system', 'Disconnected. Reconnecting...');
+      console.log('[bot:' + name + '] Disconnected');
       scheduleReconnect(entry);
     });
 
-    botInstance.on('error', (err) => { status.error = err.message; addConsoleLog(entry,'error',err.message); });
+    botInstance.on('error', (err) => { status.error = err.message; addConsoleLog(entry,'error',err.message); console.error('[bot:' + name + '] Error:', err.message); });
 
     botInstance.on('chat', (username, message) => {
       if(username===name) return;
       status.lastActivity = new Date().toISOString();
       addConsoleLog(entry, 'chat', '<'+username+'> '+message);
 
-      // Detect login/register prompts from server
       if(merged.autoLogin && merged.botPassword && !entry.hasRegistered) {
         const lower = message.toLowerCase();
         if(lower.includes('register') || lower.includes('login') || lower.includes('password') || lower.includes('please register') || lower.includes('please login')) {
@@ -174,7 +178,6 @@ function createBot(name, host, port, config = {}) {
         }
       }
 
-      // Smart AI reply to players
       if(merged.autoReply) {
         const s = smartReply(message);
         const reply = s || (Math.random() < merged.replyChance ? getRandomReply() : null);
@@ -198,13 +201,66 @@ function createBot(name, host, port, config = {}) {
 
   function startKeepalive(entry){ if(!merged.keepalive||entry._keepaliveInterval)return; entry._keepaliveInterval=setInterval(()=>{const b=entry._botInstance;if(b&&b.isChatAvailable()&&status.loggedIn){b.chat('keepalive');status.lastActivity=new Date().toISOString();}},merged.keepaliveIntervalMs); }
   function stopKeepalive(e){if(e._keepaliveInterval){clearInterval(e._keepaliveInterval);e._keepaliveInterval=null;}}
-  function startWander(entry){if(merged.mode!=='wander'||entry._wanderInt)return; entry._wanderInt=setInterval(()=>{const b=entry._botInstance;if(!b||!b.entity)return;const p=b.entity.position;const o=new vec3((Math.random()-0.5)*8,0,(Math.random()-0.5)*8);const t=p.offset(o);try{b.pathfinder.setGoal(new(require('mineflayer-pathfinder').GoalNear)(t.x,t.y,t.z,1));}catch(e){}status.position={x:p.x,y:p.y,z:p.z};status.lastActivity=new Date().toISOString();},merged.wanderIntervalMs);}
+
+  function startWander(entry){
+    if(merged.mode!=='wander'||entry._wanderInt)return;
+    entry._wanderInt=setInterval(()=>{
+      const b=entry._botInstance;
+      if(!b||!b.entity)return;
+      const players = Object.values(b.players).filter(p => p.entity && p.entity.position);
+      const myPos = b.entity.position;
+      let nearest = null; let nearestDist = 9999;
+      for (const pl of players) {
+        const d = myPos.distanceTo(pl.entity.position);
+        if (d < nearestDist) { nearestDist = d; nearest = pl; }
+      }
+      if (nearest && nearestDist < 15) {
+        try { b.lookAt(nearest.entity.position.offset(0,1.6,0)); } catch(e){}
+        if (nearestDist > 4 && Math.random() < 0.3) {
+          try { b.pathfinder.setGoal(new(require('mineflayer-pathfinder').GoalNear)(nearest.entity.position.x, nearest.entity.position.y, nearest.entity.position.z, 2)); } catch(e){}
+          addConsoleLog(entry, 'info', 'Following player ' + nearest.username);
+        }
+        status.position = {x:myPos.x,y:myPos.y,z:myPos.z};
+        status.lastActivity = new Date().toISOString();
+        return;
+      }
+      const p=b.entity.position;
+      const o=new vec3((Math.random()-0.5)*8,0,(Math.random()-0.5)*8);
+      const t=p.offset(o);
+      try{b.pathfinder.setGoal(new(require('mineflayer-pathfinder').GoalNear)(t.x,t.y,t.z,1));}catch(e){}
+      status.position={x:p.x,y:p.y,z:p.z};
+      status.lastActivity=new Date().toISOString();
+    },merged.wanderIntervalMs);
+  }
   function stopWander(e){if(e._wanderInt){clearInterval(e._wanderInt);e._wanderInt=null;}}
-  function startJump(entry){if(merged.mode!=='wander'||entry._jumpInt)return; entry._jumpInt=setInterval(()=>{const b=entry._botInstance;if(!b||!b.entity)return;try{b.setControlState('jump',true);setTimeout(()=>{if(b)b.setControlState('jump',false);},500);}catch(e){}},merged.jumpIntervalMs);}
+
+  function startJump(entry){
+    if(merged.mode!=='wander'||entry._jumpInt)return;
+    entry._jumpInt=setInterval(()=>{
+      const b=entry._botInstance;
+      if(!b||!b.entity)return;
+      try{b.setControlState('jump',true);setTimeout(()=>{if(b)b.setControlState('jump',false);},500);}catch(e){}
+    },merged.jumpIntervalMs);
+  }
   function stopJump(e){if(e._jumpInt){clearInterval(e._jumpInt);e._jumpInt=null;}const b=e._botInstance;if(b)try{b.setControlState('jump',false);}catch(e){}}
-  function startLook(entry){if(merged.mode!=='wander'||entry._lookInt)return; entry._lookInt=setInterval(()=>{const b=entry._botInstance;if(!b||!b.entity)return;try{b.look(Math.random()*Math.PI*2,(Math.random()-0.5)*Math.PI,true);}catch(e){}},merged.lookIntervalMs);}
+
+  function startLook(entry){
+    if(merged.mode!=='wander'||entry._lookInt)return;
+    entry._lookInt=setInterval(()=>{
+      const b=entry._botInstance;
+      if(!b||!b.entity)return;
+      try{b.look(Math.random()*Math.PI*2,(Math.random()-0.5)*Math.PI,true);}catch(e){}
+    },merged.lookIntervalMs);
+  }
   function stopLook(e){if(e._lookInt){clearInterval(e._lookInt);e._lookInt=null;}}
-  function startSpam(entry){if(!merged.spamMessage||entry._spamInt)return; entry._spamInt=setInterval(()=>{const b=entry._botInstance;if(b&&b.isChatAvailable()&&status.loggedIn){b.chat(merged.spamMessage);addConsoleLog(entry,'command',merged.spamMessage);}},merged.spamIntervalMs);}
+
+  function startSpam(entry){
+    if(!merged.spamMessage||entry._spamInt)return;
+    entry._spamInt=setInterval(()=>{
+      const b=entry._botInstance;
+      if(b&&b.isChatAvailable()&&status.loggedIn){b.chat(merged.spamMessage);addConsoleLog(entry,'command',merged.spamMessage);}
+    },merged.spamIntervalMs);
+  }
   function stopSpam(e){if(e._spamInt){clearInterval(e._spamInt);e._spamInt=null;}}
 
   createInstance();
