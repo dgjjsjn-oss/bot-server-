@@ -81,7 +81,8 @@ function createBot(name, host, port, config = {}) {
     status: status,
     config: merged,
     _botInstance: bot,
-    consoleLogs: []
+    consoleLogs: [],
+    hasRegistered: false
   };
 
   function createInstance() {
@@ -137,13 +138,21 @@ function createBot(name, host, port, config = {}) {
         }, 3000);
       }
 
-      // Auto login
+      // Auto register / login
       if (merged.autoLogin && merged.botPassword) {
         setTimeout(function () {
           if (botInstance && botInstance.isChatAvailable()) {
-            botInstance.chat('/login ' + merged.botPassword);
-            addConsoleLog(entry, 'command', '/login ****');
-            console.log('[bot:' + name + '] Sent /login');
+            if (!entry.hasRegistered) {
+              botInstance.chat('/register ' + merged.botPassword + ' ' + merged.botPassword);
+              entry.hasRegistered = true;
+              addConsoleLog(entry, 'command', '/register **** ****');
+              console.log('[bot:' + name + '] Sent /register (first time)');
+            } else {
+              botInstance.chat('/login ' + merged.botPassword);
+              addConsoleLog(entry, 'command', '/login ****');
+              console.log('[bot:' + name + '] Sent /login');
+            }
+            status.loggedIn = true;
           }
         }, merged.loginDelayMs);
       }
