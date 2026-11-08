@@ -220,14 +220,25 @@ async function bulkSummon() {
   const rn = document.getElementById('bulkRandom').checked;
   const mode = window.bulkMode || selectedMode || 'wander';
   const btn = document.querySelector('button[onclick="bulkSummon()"]');
+  const progress = document.getElementById('bulkProgress');
+  const progressBar = document.getElementById('bulkProgressBar');
+  const progressText = document.getElementById('bulkProgressText');
   btn.disabled=true; btn.textContent='Summoning...';
+  progress.style.display='block';
+  progressBar.style.width='0%';
+  progressText.textContent='Starting...';
   try {
     const r = await fetch(BASE + '/api/bots/bulk', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count, prefix, mode, botPassword:pass||null, autoLogin:pass?true:false, randomNames:rn})});
-    if(!r.ok){const e=await r.json(); alert(e.error||'Bulk failed'); return;}
+    if(!r.ok){const e=await r.json(); alert(e.error||'Bulk failed'); progress.style.display='none'; return;}
     const d=await r.json();
+    progressBar.style.width='100%';
+    progressText.textContent='Summoned '+d.summoned+'/'+d.requested+' bots'+(d.errors.length?' ('+d.errors.length+' failed)':'');
     alert('Summoned '+d.summoned+'/'+d.requested+' bots'+(d.errors.length?' ('+d.errors.length+' failed)':''));
     loadBots();
-  }catch(e){alert('Failed: '+e.message);} finally{btn.disabled=false; btn.textContent='Bulk Summon Bots';}
+  }catch(e){alert('Failed: '+e.message);} finally{
+    btn.disabled=false; btn.textContent='Bulk Summon Bots';
+    setTimeout(()=>{progress.style.display='none';}, 2000);
+  }
 }
 
 document.getElementById('summonBtn').addEventListener('click', summonBot);

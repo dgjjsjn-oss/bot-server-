@@ -109,7 +109,13 @@
       </div>
       <input type="hidden" id="bulkMode" value="wander">
     </div>
-    <button class="btn btn-primary" onclick="bulkSummon()">Bulk Summon Bots</button>
+    <button class="btn btn-primary" onclick="bulkSummon()" id="bulkBtn">Bulk Summon Bots</button>
+    <div id="bulkProgress" style="display:none; margin-top:12px;">
+      <div style="background:#334155;height:6px;border-radius:3px;overflow:hidden;">
+        <div id="bulkProgressBar" style="background:var(--primary);height:100%;width:0%;transition:width 0.3s;"></div>
+      </div>
+      <div id="bulkProgressText" style="font-size:12px;color:var(--text-muted);margin-top:6px;">Ready</div>
+    </div>
   </div>
 
   <div class="card">
